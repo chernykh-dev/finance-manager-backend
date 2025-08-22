@@ -1,0 +1,24 @@
+﻿services:
+  fmb-app:
+    build:
+      context: ../FinanceManagerBackend.API
+      dockerfile: Dockerfile
+
+  fmb-db:
+    container_name: fmb-db
+    image: postgres:16
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data/fmb-db-data:rwx
+    environment:
+      POSTGRES_DB: "fmb-db"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      PGDATA: /var/lib/postgresql/data/fmb-db-data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
