@@ -7,5 +7,6 @@ await Host
         builder.UseStartup<Startup>();
     })
     .Build()
-    .CreateDbIfNotExists()
+    .MigrateDatabase()
+    .SeedDatabase()
     .RunAsync();

@@ -15,7 +15,7 @@ public class AuthService(IOptions<AuthOptions> authOptions) : IAuthService
     {
         var claims = new List<Claim>
         {
-            new Claim("sub", user.Id.ToString())
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString())
         };
 
         expiresAt = DateTime.UtcNow.AddMinutes(authOptions.Value.ExpirationTimeInMinutes);

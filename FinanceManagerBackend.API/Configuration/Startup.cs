@@ -1,12 +1,11 @@
-﻿using System.Reflection;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
-using FinanceManagerBackend.API.HttpPipelines;
 using FinanceManagerBackend.API.Infrastructure;
-using FinanceManagerBackend.API.Options;
 using Mapster;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.OpenApi.Models;
 
 namespace FinanceManagerBackend.API.Configuration;
@@ -76,7 +75,15 @@ public class Startup
             });
         });
 
-        services.AddControllers();
+        services.AddControllers(opt =>
+        {
+            var policy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(JwtRegisteredClaimNames.Sub)
+                .Build();
+
+            opt.Filters.Add(new AuthorizeFilter(policy));
+        });
 
         services.AddEndpointsApiExplorer();
 
@@ -130,7 +137,6 @@ public class Startup
 
         app.UseRouting();
 
-        app.UseMiddleware<UserRequestContextMiddleware>();
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -138,7 +144,5 @@ public class Startup
         {
             endpoints.MapControllers();
         });
-
-        app.ApplyMigrations();
     }
 }

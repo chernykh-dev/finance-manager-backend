@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.HttpPipelines;
@@ -74,7 +75,11 @@ public static class ServiceCollectionExtensions
         });
 
         services
-            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddAuthentication(opt =>
+            {
+                opt.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
             .AddJwtBearer(opt =>
             {
                 opt.TokenValidationParameters = new TokenValidationParameters()
@@ -92,9 +97,10 @@ public static class ServiceCollectionExtensions
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = AuthHelper.GetSymmetricSecurityKey(authOptions.SecretKey),
                 };
-            });
 
-        services.AddScoped<IUserRequestContext, UserRequestContext>();
+                // Disable automapping from sub to schema/.../nameidentifier
+                opt.MapInboundClaims = false;
+            });
 
         return services;
     }

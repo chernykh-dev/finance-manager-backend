@@ -9,7 +9,7 @@ public class User : BaseEntity
 
     public string Password { get; set; }
 
-    public string? RefreshToken { get; set; }
+    public string RefreshToken { get; set; }
 
-    public DateTimeOffset? ExpiredAt { get; set; }
+    public DateTimeOffset ExpiredAt { get; set; }
 }

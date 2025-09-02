@@ -1,10 +1,25 @@
 ﻿using FinanceManagerBackend.API.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinanceManagerBackend.API.Configuration;
 
 public static class HostExtensions
 {
-    public static IHost CreateDbIfNotExists(this IHost host)
+    public static IHost MigrateDatabase(this IHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ServiceDbContext>();
+        var pendingMigrations = context.Database.GetPendingMigrations();
+
+        if (pendingMigrations.Any())
+        {
+            context.Database.Migrate();
+        }
+
+        return host;
+    }
+
+    public static IHost SeedDatabase(this IHost host)
     {
         using var scope = host.Services.CreateScope();
 
