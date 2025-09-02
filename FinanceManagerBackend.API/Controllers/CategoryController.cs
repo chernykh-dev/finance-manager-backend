@@ -1,6 +1,7 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Models.Currencies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceManagerBackend.API.Controllers;

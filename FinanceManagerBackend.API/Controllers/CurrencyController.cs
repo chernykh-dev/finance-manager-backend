@@ -3,6 +3,7 @@ using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Models.Currencies;
 using Mapster;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -14,6 +15,8 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
     [HttpGet]
     public async Task<ActionResult<IList<CurrencyResponse>>> GetAllAsync(CancellationToken cancellationToken = default)
     {
+        var userId = GetUserId();
+
         var entities = await currencyRepository.GetAllReadonlyAsync(cancellationToken);
 
         return Ok(entities.Adapt<List<CurrencyResponse>>());
@@ -37,19 +40,15 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
         CancellationToken cancellationToken = default)
     {
         var entity = request.Adapt<Currency>();
-        entity.Id = Guid.NewGuid();
 
-        try
+        var entityWithName = await currencyRepository.GetByReadonlyAsync(x => x.Name == entity.Name, cancellationToken);
+        if (entityWithName != null)
         {
-            await currencyRepository.CreateAsync(entity, cancellationToken);
+            return Conflict();
         }
-        catch (DbUpdateException exception)
-        {
-            if (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-            {
-                return Conflict();
-            }
-        }
+
+        entity.Id = Guid.NewGuid();
+        await currencyRepository.CreateAsync(entity, cancellationToken);
 
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<CurrencyResponse>());
 
