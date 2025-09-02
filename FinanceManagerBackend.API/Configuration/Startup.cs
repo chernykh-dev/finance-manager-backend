@@ -3,6 +3,8 @@ using System.Reflection;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using FinanceManagerBackend.API.Infrastructure;
+using FinanceManagerBackend.API.Validators;
+using FluentValidation;
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
@@ -41,6 +43,7 @@ public class Startup
         services.ConfigureServices();
 
         services.AddMapster();
+        services.AddValidatorsFromAssemblyContaining(typeof(AccountCommonValidator));
 
         services.AddSwaggerGen(opt =>
         {

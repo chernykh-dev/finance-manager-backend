@@ -1,12 +1,14 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Models.Accounts;
+using FluentValidation;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceManagerBackend.API.Controllers;
 
-public class AccountController(IEntityRepository<Account> accountRepository) : BaseController
+public class AccountController(IEntityRepository<Account> accountRepository, IValidator<Account> accountCommonValidator)
+    : BaseController
 {
     [HttpGet]
     public async Task<ActionResult<IList<AccountResponse>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -32,11 +34,14 @@ public class AccountController(IEntityRepository<Account> accountRepository) : B
     }
 
     [HttpPost]
-    public async Task<ActionResult<AccountResponse>> CreateAsync([FromBody] CreateAccountRequest request, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<AccountResponse>> CreateAsync([FromBody] CreateAccountRequest request,
+        CancellationToken cancellationToken = default)
     {
         var userId = GetUserId();
 
         var entity = request.Adapt<Account>();
+
+        await accountCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
 
         var entityWithName =
             await accountRepository.GetByReadonlyAsync(x => x.Name == entity.Name && x.UserId == userId,
@@ -67,6 +72,8 @@ public class AccountController(IEntityRepository<Account> accountRepository) : B
 
         var updatedEntity = request.Adapt<Account>();
         updatedEntity.Id = id;
+
+        await accountCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
 
         await accountRepository.UpdateAsync(updatedEntity, cancellationToken);
 
