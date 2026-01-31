@@ -1,8 +1,16 @@
-﻿namespace FinanceManagerBackend.API.Models;
+﻿using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.Annotations;
 
+namespace FinanceManagerBackend.API.Models;
+
+/// <summary>
+/// Base update request.
+/// </summary>
 public class BaseUpdateRequest
 {
-    public DateTimeOffset CreatedAt { get; set; }
-
-    public DateTimeOffset UpdatedAt { get; set; }
+    /// <summary>
+    /// Updated at.
+    /// </summary>
+    [JsonIgnore]
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

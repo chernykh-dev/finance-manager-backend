@@ -10,8 +10,17 @@ using Npgsql;
 
 namespace FinanceManagerBackend.API.Controllers;
 
+/// <summary>
+/// Currency controller.
+/// </summary>
+/// <param name="currencyRepository"></param>
 public class CurrencyController(IEntityRepository<Currency> currencyRepository) : BaseController
 {
+    /// <summary>
+    /// Get all currencies.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet]
     public async Task<ActionResult<IList<CurrencyResponse>>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -22,6 +31,12 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
         return Ok(entities.Adapt<List<CurrencyResponse>>());
     }
 
+    /// <summary>
+    /// Get currency by id.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CurrencyResponse>> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -35,6 +50,12 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
         return Ok(entity.Adapt<CurrencyResponse>());
     }
 
+    /// <summary>
+    /// Create new currency.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPost]
     public async Task<ActionResult<CurrencyResponse>> CreateAsync([FromBody] CreateCurrencyRequest request,
         CancellationToken cancellationToken = default)
@@ -55,6 +76,13 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
         return result;
     }
 
+    /// <summary>
+    /// Update currency.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateAsync(Guid id, [FromBody] UpdateCurrencyRequest request,
         CancellationToken cancellationToken = default)
@@ -74,6 +102,12 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
         return Ok();
     }
 
+    /// <summary>
+    /// Delete currency.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {

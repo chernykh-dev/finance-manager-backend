@@ -3,8 +3,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinanceManagerBackend.API.Configuration;
 
+/// <summary>
+/// Host extension methods.
+/// </summary>
 public static class HostExtensions
 {
+    /// <summary>
+    /// Apply migrations to database.
+    /// </summary>
+    /// <param name="host"></param>
+    /// <returns></returns>
     public static IHost MigrateDatabase(this IHost host)
     {
         using var scope = host.Services.CreateScope();
@@ -19,6 +27,11 @@ public static class HostExtensions
         return host;
     }
 
+    /// <summary>
+    /// Seed database initial data.
+    /// </summary>
+    /// <param name="host"></param>
+    /// <returns></returns>
     public static IHost SeedDatabase(this IHost host)
     {
         using var scope = host.Services.CreateScope();
@@ -30,7 +43,7 @@ public static class HostExtensions
         try
         {
             var context = services.GetRequiredService<ServiceDbContext>();
-            DbInitializer.Initialize(context, out bool isAlreadyInitialized);
+            DbInitializer.Initialize(context, out var isAlreadyInitialized);
 
             if (isAlreadyInitialized)
             {

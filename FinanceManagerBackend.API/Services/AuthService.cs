@@ -9,8 +9,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FinanceManagerBackend.API.Services;
 
+/// <inheritdoc />
 public class AuthService(IOptions<AuthOptions> authOptions) : IAuthService
 {
+    /// <inheritdoc />
     public string GetAccessToken(User user, out DateTime expiresAt)
     {
         var claims = new List<Claim>
@@ -32,6 +34,7 @@ public class AuthService(IOptions<AuthOptions> authOptions) : IAuthService
         return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 
+    /// <inheritdoc />
     public string GetRefreshToken()
     {
         var randomNumber = new byte[32];
@@ -42,6 +45,7 @@ public class AuthService(IOptions<AuthOptions> authOptions) : IAuthService
         return Convert.ToBase64String(randomNumber);
     }
 
+    /// <inheritdoc />
     public ClaimsPrincipal GetPrincipalFromToken(string accessToken)
     {
         var tokenValidationParameters = new TokenValidationParameters

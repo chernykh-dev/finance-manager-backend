@@ -4,9 +4,16 @@ using FluentValidation;
 
 namespace FinanceManagerBackend.API.Validators;
 
-public class AccountCommonValidator : AbstractValidator<Account>
+/// <summary>
+/// Validator for check account foreign keys.
+/// </summary>
+public class AccountRelationsValidator : AbstractValidator<Account>
 {
-    public AccountCommonValidator(IEntityRepository<Currency> currencyRepository)
+    /// <summary>
+    /// Configure validation rules.
+    /// </summary>
+    /// <param name="currencyRepository"></param>
+    public AccountRelationsValidator(IEntityRepository<Currency> currencyRepository)
     {
         RuleFor(x => x.CurrencyId)
             .MustAsync(async (currencyId, cancellationToken) =>

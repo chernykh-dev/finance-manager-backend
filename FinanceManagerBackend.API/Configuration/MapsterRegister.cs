@@ -7,10 +7,17 @@ using Mapster;
 
 namespace FinanceManagerBackend.API.Configuration;
 
+/// <summary>
+/// Register Mapster Models.
+/// </summary>
 public class MapsterRegister : ICodeGenerationRegister
 {
     private Type[] _entityTypes;
 
+    /// <summary>
+    /// Register types.
+    /// </summary>
+    /// <param name="config"></param>
     public void Register(CodeGenerationConfig config)
     {
         _entityTypes = Assembly

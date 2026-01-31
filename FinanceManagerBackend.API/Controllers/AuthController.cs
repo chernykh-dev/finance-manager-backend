@@ -12,8 +12,19 @@ using Microsoft.Extensions.Options;
 
 namespace FinanceManagerBackend.API.Controllers;
 
+/// <summary>
+/// Auth controller.
+/// </summary>
+/// <param name="userRepository"></param>
+/// <param name="authService"></param>
 public class AuthController(IEntityRepository<User> userRepository, IAuthService authService) : BaseController
 {
+    /// <summary>
+    /// Register new user.
+    /// </summary>
+    /// <param name="credentials"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [AllowAnonymous]
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> CreateUserAsync([FromBody] UserCredentials credentials,
@@ -36,6 +47,12 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
         return CreatedAtAction("Login", result);
     }
 
+    /// <summary>
+    /// Login exist user.
+    /// </summary>
+    /// <param name="credentials"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> LoginAsync([FromBody] UserCredentials credentials,
@@ -58,6 +75,11 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
         return Ok(result);
     }
 
+    /// <summary>
+    /// Logout current user.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPost("logout")]
     public async Task<IActionResult> LogoutAsync(CancellationToken cancellationToken = default)
     {
@@ -77,8 +99,14 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
         return Ok();
     }
 
+    /// <summary>
+    /// Refresh current user.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPost("refresh")]
-    public async Task<IActionResult> RefreshAsync([FromBody] RefreshRequest request, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<AuthResponse>> RefreshAsync([FromBody] RefreshRequest request, CancellationToken cancellationToken = default)
     {
         var userId = GetUserId();
 

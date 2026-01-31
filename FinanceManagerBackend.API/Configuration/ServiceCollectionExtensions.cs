@@ -11,8 +11,16 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FinanceManagerBackend.API.Configuration;
 
+/// <summary>
+/// ServiceCollection extension methods.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Configure entity repositories to DI. Entities are taken from BaseEntity namespace (`Domain/Entities`).
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
     public static IServiceCollection ConfigureRepositories(this IServiceCollection services)
     {
         var ns = typeof(BaseEntity).Namespace;
@@ -31,6 +39,12 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Configure services to DI. Services are taken from IAuthService namespace (`Services`).
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    /// <exception cref="NullReferenceException"></exception>
     public static IServiceCollection ConfigureServices(this IServiceCollection services)
     {
         var ns = typeof(IAuthService).Namespace;
@@ -57,6 +71,13 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Configure authentication for app.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="authSection"></param>
+    /// <returns></returns>
+    /// <exception cref="NullReferenceException"></exception>
     public static IServiceCollection ConfigureAuthentication(this IServiceCollection services, IConfigurationSection authSection)
     {
         var authOptions = authSection.Get<AuthOptions>();

@@ -7,9 +7,19 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceManagerBackend.API.Controllers;
 
+/// <summary>
+/// Account controller.
+/// </summary>
+/// <param name="accountRepository"></param>
+/// <param name="accountCommonValidator"></param>
 public class AccountController(IEntityRepository<Account> accountRepository, IValidator<Account> accountCommonValidator)
     : BaseController
 {
+    /// <summary>
+    /// Get all accounts.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet]
     public async Task<ActionResult<IList<AccountResponse>>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -20,6 +30,12 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
         return Ok(entities.Adapt<List<AccountResponse>>());
     }
 
+    /// <summary>
+    /// Get account by id.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AccountResponse>> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -33,6 +49,12 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
         return Ok(entity.Adapt<AccountResponse>());
     }
 
+    /// <summary>
+    /// Create account.
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPost]
     public async Task<ActionResult<AccountResponse>> CreateAsync([FromBody] CreateAccountRequest request,
         CancellationToken cancellationToken = default)
@@ -59,6 +81,13 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
         return result;
     }
 
+    /// <summary>
+    /// Update account.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> UpdateAsync(Guid id, [FromBody] UpdateAccountRequest request,
         CancellationToken cancellationToken = default)
@@ -80,6 +109,12 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
         return Ok();
     }
 
+    /// <summary>
+    /// Delete account.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {

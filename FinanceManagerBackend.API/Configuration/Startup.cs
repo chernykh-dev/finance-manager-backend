@@ -12,10 +12,20 @@ using Microsoft.OpenApi.Models;
 
 namespace FinanceManagerBackend.API.Configuration;
 
+/// <summary>
+/// Startup configurations.
+/// </summary>
 public class Startup
 {
+    /// <summary>
+    /// App configuration.
+    /// </summary>
     public IConfiguration Configuration { get; }
 
+    /// <summary>
+    /// Constructor.
+    /// </summary>
+    /// <param name="env"></param>
     public Startup(IWebHostEnvironment env)
     {
         var builder = new ConfigurationBuilder()
@@ -33,6 +43,10 @@ public class Startup
         Configuration = builder.Build();
     }
 
+    /// <summary>
+    /// Configure services for app.
+    /// </summary>
+    /// <param name="services"></param>
     public void ConfigureServices(IServiceCollection services)
     {
         services.AddLogging();
@@ -43,7 +57,7 @@ public class Startup
         services.ConfigureServices();
 
         services.AddMapster();
-        services.AddValidatorsFromAssemblyContaining(typeof(AccountCommonValidator));
+        services.AddValidatorsFromAssemblyContaining(typeof(AccountRelationsValidator));
 
         services.AddSwaggerGen(opt =>
         {
@@ -114,6 +128,11 @@ public class Startup
         });
     }
 
+    /// <summary>
+    /// Configure app.
+    /// </summary>
+    /// <param name="app"></param>
+    /// <param name="env"></param>
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
         if (env.IsDevelopment())

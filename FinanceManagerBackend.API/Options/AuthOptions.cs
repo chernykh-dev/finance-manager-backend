@@ -1,12 +1,27 @@
 ﻿namespace FinanceManagerBackend.API.Options;
 
+/// <summary>
+/// Auth configuration options.
+/// </summary>
 public class AuthOptions
 {
-    public string Issuer { get; set; }
+    /// <summary>
+    /// Auth issuer.
+    /// </summary>
+    public string Issuer { get; set; } = null!;
 
-    public string Audience { get; set; }
+    /// <summary>
+    /// Auth audience.
+    /// </summary>
+    public string Audience { get; set; } = null!;
 
-    public string SecretKey { get; set; }
+    /// <summary>
+    /// Auth secret key.
+    /// </summary>
+    public string SecretKey { get; set; } = null!;
 
+    /// <summary>
+    /// Auth expiration time (in minutes).
+    /// </summary>
     public int ExpirationTimeInMinutes { get; set; }
 }

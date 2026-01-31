@@ -2,8 +2,16 @@
 
 namespace FinanceManagerBackend.API.Infrastructure;
 
+/// <summary>
+/// Database initializer.
+/// </summary>
 public class DbInitializer
 {
+    /// <summary>
+    /// Initialize database required data.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="isAlreadyInitialized"></param>
     public static void Initialize(ServiceDbContext context, out bool isAlreadyInitialized)
     {
         context.Database.EnsureCreated();

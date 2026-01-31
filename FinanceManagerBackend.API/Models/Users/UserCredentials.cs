@@ -1,8 +1,21 @@
-﻿namespace FinanceManagerBackend.API.Models.Users;
+﻿using System.ComponentModel.DataAnnotations;
 
+namespace FinanceManagerBackend.API.Models.Users;
+
+/// <summary>
+/// User credentials model.
+/// </summary>
 public class UserCredentials
 {
-    public string Name { get; set; }
+    /// <summary>
+    /// User name.
+    /// </summary>
+    [Required]
+    public string Name { get; set; } = null!;
 
-    public string Password { get; set; }
+    /// <summary>
+    /// User password.
+    /// </summary>
+    [Required]
+    public string Password { get; set; } = null!;
 }

@@ -1,12 +1,15 @@
 using FinanceManagerBackend.API.Configuration;
 
-await Host
-    .CreateDefaultBuilder(args)
-    .ConfigureWebHostDefaults(builder =>
+public class Program
+{
+    public static async Task Main(string[] args)
     {
-        builder.UseStartup<Startup>();
-    })
-    .Build()
-    .MigrateDatabase()
-    .SeedDatabase()
-    .RunAsync();
+        await Host
+            .CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(builder => { builder.UseStartup<Startup>(); })
+            .Build()
+            .MigrateDatabase()
+            .SeedDatabase()
+            .RunAsync();
+    }
+}
