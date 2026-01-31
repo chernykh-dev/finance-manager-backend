@@ -3,6 +3,15 @@
     build:
       context: ../FinanceManagerBackend.API
       dockerfile: Dockerfile
+    ports:
+      - "8080:8080" # Http
+      - "8081:8081" # Https
+    depends_on:
+      fmb-db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DB_HOST: "fmb-db"
 
   fmb-db:
     container_name: fmb-db
