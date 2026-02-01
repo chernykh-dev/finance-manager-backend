@@ -51,22 +51,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: DEBUG – list repo files
-        run: |
-          pwd
-          ls -la
-          echo "---- docker dir ----"
-          ls -la docker || true
-
       - name: Copy compose & env to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: |
-            docker/docker-compose.test.yaml
-            docker/.env.test
+          source: docker/docker-compose.test.yaml,docker/.env.test
           target: ${{ env.VPS_PATH }}
 
       - name: Deploy on VPS
