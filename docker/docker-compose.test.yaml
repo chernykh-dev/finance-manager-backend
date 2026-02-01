@@ -9,6 +9,7 @@
         condition: service_healthy
     env_file:
       - .env.test
+    restart: always
 
   fmb-db:
     container_name: fmb-db

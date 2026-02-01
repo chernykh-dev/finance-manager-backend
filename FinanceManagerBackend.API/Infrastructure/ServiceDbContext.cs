@@ -36,8 +36,6 @@ public class ServiceDbContext(ILogger<ServiceDbContext> logger) : DbContext
     {
         var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
 
-        logger.LogInformation(dbHost);
-
         optionsBuilder
             .UseNpgsql($"Host={dbHost};Port=5432;Database=fmb-db;Username=postgres;Password=postgres;")
             .LogTo(Console.WriteLine)
