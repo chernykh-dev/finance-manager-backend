@@ -1,17 +1,14 @@
 ﻿services:
   fmb-app:
-    build:
-      context: ../FinanceManagerBackend.API
-      dockerfile: Dockerfile
+    image: ghcr.io/chernykh-dev/fmb-api
     ports:
       - "8080:8080" # Http
       - "8081:8081" # Https
     depends_on:
       fmb-db:
         condition: service_healthy
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      DB_HOST: "fmb-db"
+    env_file:
+      - .env.test
 
   fmb-db:
     container_name: fmb-db
@@ -21,15 +18,18 @@
       - "5432:5432"
     volumes:
       - ./pg-data:/var/lib/postgresql/data/fmb-db-data:rwx
-    environment:
-      POSTGRES_DB: "fmb-db"
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
-      PGDATA: /var/lib/postgresql/data/fmb-db-data
+    env_file:
+      - .env.test
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-
+  nginx:
+    image: ghcr.io/chernykh-dev/fmb-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - fmb-app
+    restart: always
