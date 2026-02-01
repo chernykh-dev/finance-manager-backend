@@ -51,6 +51,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: DEBUG – list repo files
+        run: |
+          pwd
+          ls -la
+          echo "---- docker dir ----"
+          ls -la docker || true
+
       - name: Copy compose & env to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
