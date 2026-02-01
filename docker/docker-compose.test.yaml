@@ -1,5 +1,6 @@
 ﻿services:
   fmb-app:
+    container_name: fmb-app
     image: ghcr.io/chernykh-dev/fmb-api
     ports:
       - "8080:8080" # Http
