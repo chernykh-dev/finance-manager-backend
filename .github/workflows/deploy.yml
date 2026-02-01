@@ -58,8 +58,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: |
-            docker-compose.prod.yml
-            .env.prod
+            docker/docker-compose.prod.yml
+            docker/.env.prod
           target: ${{ env.VPS_PATH }}
 
       - name: Deploy on VPS
