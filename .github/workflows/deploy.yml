@@ -58,7 +58,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: |
-            docker/docker-compose.test.yml
+            docker/docker-compose.test.yaml
             docker/.env.test
           target: ${{ env.VPS_PATH }}
 
@@ -70,6 +70,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd ${{ env.VPS_PATH }}
-            docker compose -f docker-compose.test.yml pull
-            docker compose -f docker-compose.test.yml up -d
+            docker compose -f docker-compose.test.yaml pull
+            docker compose -f docker-compose.test.yaml up -d
             docker image prune -f
