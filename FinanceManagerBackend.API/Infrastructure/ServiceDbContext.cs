@@ -6,7 +6,7 @@ namespace FinanceManagerBackend.API.Infrastructure;
 /// <summary>
 /// App database context.
 /// </summary>
-public class ServiceDbContext(ILogger<ServiceDbContext> logger) : DbContext
+public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
 {
     /// <summary>
     /// Accounts.
@@ -34,11 +34,15 @@ public class ServiceDbContext(ILogger<ServiceDbContext> logger) : DbContext
     /// <param name="optionsBuilder"></param>
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+        var dbHost = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
+        var dbPort = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
+        var dbName = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "fmb-app";
+        var dbUsername = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
+        var dbPassword = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres";
 
         optionsBuilder
-            .UseNpgsql($"Host={dbHost};Port=5432;Database=fmb-db;Username=postgres;Password=postgres;")
-            .LogTo(Console.WriteLine)
+            .UseNpgsql($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};")
+            .UseLoggerFactory(loggerFactory)
             .UseSnakeCaseNamingConvention();
     }
 }
