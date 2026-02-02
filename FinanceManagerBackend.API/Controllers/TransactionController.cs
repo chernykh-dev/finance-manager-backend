@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Infrastructure.Specifications;
 using FinanceManagerBackend.API.Models.Transactions;
 using FinanceManagerBackend.API.Services;
 using FluentValidation;
@@ -38,6 +39,26 @@ public class TransactionController(
         }
 
         return Ok(entity);
+    }
+
+    /// <summary>
+    /// Get account transactions by period [startDate, endDate].
+    /// </summary>
+    /// <param name="accountId"></param>
+    /// <param name="startDate">If null, startDate is min.</param>
+    /// <param name="endDate">If null, startDate is max.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpGet("{accountId:guid}/period")]
+    public async Task<ActionResult<List<TransactionResponse>>> GetAccountTransactionsByPeriodAsync(Guid accountId,
+        [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate,
+        CancellationToken cancellationToken = default)
+    {
+        var entities =
+            await transactionRepository.GetAccountTransactionsByPeriod(accountId, startDate, endDate,
+                cancellationToken);
+
+        return Ok(entities);
     }
 
     /// <summary>
@@ -92,6 +113,22 @@ public class TransactionController(
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
+
+        return Ok();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteAsync(Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await transactionRepository.GetByIdReadonlyAsync(id, cancellationToken);
+
+        if (entity == null)
+        {
+            return NotFound();
+        }
+
+        await transactionRepository.DeleteAsync(entity, cancellationToken);
 
         return Ok();
     }
