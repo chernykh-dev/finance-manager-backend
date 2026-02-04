@@ -74,6 +74,7 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
         }
 
         entity.Id = Guid.NewGuid();
+        entity.UserId = userId;
         await accountRepository.CreateAsync(entity, cancellationToken);
 
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<AccountResponse>());
