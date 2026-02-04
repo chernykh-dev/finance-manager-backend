@@ -19,7 +19,7 @@
     ports:
       - "5432:5432"
     volumes:
-      - ./pg-data:/var/lib/postgresql/data/fmb-db-data:rwx
+      - pgdata:/var/lib/postgresql/data
     env_file:
       - .env.test
     healthcheck:
@@ -35,3 +35,6 @@
     depends_on:
       - fmb-app
     restart: always
+
+volumes:
+  pgdata:
