@@ -20,7 +20,7 @@
     ports:
       - "5432:5432"
     volumes:
-      - ./pg-data:/var/lib/postgresql/data/fmb-db-data:rwx
+      - ./pg-data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: "fmb-db"
       POSTGRES_USER: "postgres"
