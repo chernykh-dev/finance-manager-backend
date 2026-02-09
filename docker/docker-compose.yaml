@@ -13,8 +13,8 @@
       ASPNETCORE_ENVIRONMENT: Development
       POSTGRES_HOST: "fmb-db"
       POSTGRES_DB: "fmb-db"
-      POSTGRES_USER: "puser"
-      POSTGRES_PASSWORD: "puserpass"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "myVeryStrongPassword123@456"
 
   fmb-db:
     container_name: fmb-db
@@ -26,8 +26,8 @@
       - pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: "fmb-db"
-      POSTGRES_USER: "puser"
-      POSTGRES_PASSWORD: "puserpass"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "myVeryStrongPassword123@456"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
