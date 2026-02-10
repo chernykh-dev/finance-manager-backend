@@ -24,7 +24,7 @@ public class TransactionRelationsValidator : AbstractValidator<Transaction>
 
                 return entity != null;
             })
-            .WithMessage("Account not found");
+            .WithMessage((transaction, id) => $"Account with id={transaction.AccountId} not found");
 
         RuleFor(x => x.CategoryId)
             .MustAsync(async (categoryId, cancellationToken) =>
@@ -33,6 +33,6 @@ public class TransactionRelationsValidator : AbstractValidator<Transaction>
 
                 return entity != null;
             })
-            .WithMessage("Category not found");
+            .WithMessage((transaction, id) => $"Category with id={transaction.CategoryId} not found");
     }
 }

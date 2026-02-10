@@ -22,6 +22,6 @@ public class AccountRelationsValidator : AbstractValidator<Account>
 
                 return entity != null;
             })
-            .WithMessage("Currency not found");
+            .WithMessage((account, id) => $"Currency with id={account.CurrencyId} not found");
     }
 }
