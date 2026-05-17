@@ -13,9 +13,10 @@ public interface IAuthService
     /// Returns access token for user.
     /// </summary>
     /// <param name="user"></param>
-    /// <param name="expiresAt">Token expires at.</param>
+    /// <param name="accessTokenExpiresAt">Access token expires at.</param>
+    /// <param name="refreshTokenExpiresAt">Refresh token expires at.</param>
     /// <returns></returns>
-    string GetAccessToken(User user, out DateTime expiresAt);
+    string GetAccessToken(User user, out DateTime accessTokenExpiresAt, out DateTime refreshTokenExpiresAt);
 
     /// <summary>
     /// Returns refresh token for current user.

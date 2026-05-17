@@ -26,5 +26,5 @@ public class User : BaseEntity
     /// <summary>
     /// User auth expired at.
     /// </summary>
-    public DateTimeOffset ExpiredAt { get; set; }
+    public DateTimeOffset RefreshTokenExpiredAt { get; set; }
 }

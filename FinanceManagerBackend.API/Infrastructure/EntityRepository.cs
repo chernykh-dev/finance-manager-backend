@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace FinanceManagerBackend.API.Infrastructure;
 
 /// <inheritdoc />
-public class EntityRepository<TEntity>(ServiceDbContext context) : IEntityRepository<TEntity>
+public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityRepository<TEntity>> logger) : IEntityRepository<TEntity>
     where TEntity : BaseEntity
 {
     /// <inheritdoc />
@@ -110,7 +110,11 @@ public class EntityRepository<TEntity>(ServiceDbContext context) : IEntityReposi
             .Set<TEntity>()
             .AddAsync(entity, cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
+        var result = await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation($"result: {result}");
+
+        logger.LogInformation(context.Database.GetConnectionString());
 
         return entityEntry.Entity;
     }

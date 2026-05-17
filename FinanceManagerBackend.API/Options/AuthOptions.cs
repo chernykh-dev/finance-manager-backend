@@ -21,7 +21,12 @@ public class AuthOptions
     public string SecretKey { get; set; } = null!;
 
     /// <summary>
-    /// Auth expiration time (in minutes).
+    /// Access token expiration time (in minutes).
     /// </summary>
-    public int ExpirationTimeInMinutes { get; set; }
+    public int AccessTokenExpirationTimeInMinutes { get; set; }
+
+    /// <summary>
+    /// Refresh token expiration time (in minutes).
+    /// </summary>
+    public int RefreshTokenExpirationTimeInMinutes { get; set; }
 }

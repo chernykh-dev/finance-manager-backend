@@ -1,13 +1,21 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
+using FinanceManagerBackend.API.Exceptions;
+using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
 using FinanceManagerBackend.API.Infrastructure;
 using FinanceManagerBackend.API.Validators;
 using FluentValidation;
 using Mapster;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
 namespace FinanceManagerBackend.API.Configuration;
@@ -55,6 +63,22 @@ public class Startup
 
         services.ConfigureRepositories();
         services.ConfigureServices();
+        services.ConfigureExceptionHandlers();
+        services.AddProblemDetails(opt =>
+        {
+            opt.CustomizeProblemDetails = context =>
+            {
+                context.HttpContext.Response.ContentType = "application/problem+json";
+
+                context.ProblemDetails.Instance =
+                    $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
+
+                context.ProblemDetails.Extensions.TryAdd("requestId", context.HttpContext.TraceIdentifier);
+
+                var activity = context.HttpContext.Features.Get<IHttpActivityFeature>()?.Activity;
+                context.ProblemDetails.Extensions.TryAdd("traceId", activity?.Id);
+            };
+        });
 
         services.AddMapster();
         services.AddValidatorsFromAssemblyContaining(typeof(AccountRelationsValidator));
@@ -135,6 +159,8 @@ public class Startup
     /// <param name="env"></param>
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
+        app.UseExceptionHandler();
+
         if (env.IsDevelopment())
         {
             app.UseSwagger();
@@ -161,6 +187,8 @@ public class Startup
 
         app.UseAuthentication();
         app.UseAuthorization();
+
+        // app.UseStatusCodePages();
 
         app.UseEndpoints(endpoints =>
         {

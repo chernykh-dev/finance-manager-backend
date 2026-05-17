@@ -92,7 +92,7 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
             return NotFound("User not found");
         }
 
-        entity.ExpiredAt = DateTimeOffset.UtcNow;
+        entity.RefreshTokenExpiredAt = DateTimeOffset.UtcNow;
 
         await userRepository.UpdateAsync(entity, cancellationToken);
 
@@ -105,22 +105,26 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
     /// <param name="request"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
+    [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> RefreshAsync([FromBody] RefreshRequest request, CancellationToken cancellationToken = default)
     {
-        var userId = GetUserId();
+        var userWithRequestToken = await userRepository
+            .GetByReadonlyAsync(x => x.RefreshToken == request.RefreshToken, cancellationToken);
 
-        var entity = await userRepository.GetByAsync(
-            x => x.Id == userId && x.RefreshToken == request.RefreshToken, cancellationToken);
-
-        if (entity == null)
+        if (userWithRequestToken == null)
         {
-            return NotFound("User not found");
+            return BadRequest("Invalid refresh token");
         }
 
-        var result = GenerateResultForUser(entity);
+        if (userWithRequestToken.RefreshTokenExpiredAt < DateTimeOffset.UtcNow)
+        {
+            return Unauthorized("Refresh token expired");
+        }
 
-        await userRepository.UpdateAsync(entity, cancellationToken);
+        var result = GenerateResultForUser(userWithRequestToken);
+
+        await userRepository.UpdateAsync(userWithRequestToken, cancellationToken);
 
         return Ok(result);
     }
@@ -129,11 +133,11 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
     {
         var result = new AuthResponse()
         {
-            AccessToken = authService.GetAccessToken(entity, out var expiresAt),
+            AccessToken = authService.GetAccessToken(entity, out var _, out var refreshTokenExpiresAt),
             RefreshToken = authService.GetRefreshToken()
         };
 
-        entity.ExpiredAt = expiresAt;
+        entity.RefreshTokenExpiredAt = refreshTokenExpiresAt;
         entity.RefreshToken = result.RefreshToken;
 
         return result;

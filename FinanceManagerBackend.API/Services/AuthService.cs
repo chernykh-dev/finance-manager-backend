@@ -13,20 +13,21 @@ namespace FinanceManagerBackend.API.Services;
 public class AuthService(IOptions<AuthOptions> authOptions) : IAuthService
 {
     /// <inheritdoc />
-    public string GetAccessToken(User user, out DateTime expiresAt)
+    public string GetAccessToken(User user, out DateTime accessTokenExpiresAt, out DateTime refreshTokenExpiresAt)
     {
         var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString())
         };
 
-        expiresAt = DateTime.UtcNow.AddMinutes(authOptions.Value.ExpirationTimeInMinutes);
+        accessTokenExpiresAt = DateTime.UtcNow.AddMinutes(authOptions.Value.AccessTokenExpirationTimeInMinutes);
+        refreshTokenExpiresAt = DateTime.UtcNow.AddMinutes(authOptions.Value.RefreshTokenExpirationTimeInMinutes);
 
         var jwt = new JwtSecurityToken(
             issuer: authOptions.Value.Issuer,
             audience: authOptions.Value.Audience,
             claims: claims,
-            expires: expiresAt,
+            expires: accessTokenExpiresAt,
             signingCredentials: new SigningCredentials(AuthHelper.GetSymmetricSecurityKey(authOptions.Value.SecretKey),
                 SecurityAlgorithms.HmacSha256Signature)
         );

@@ -1,8 +1,10 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.HttpPipelines;
+using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
 using FinanceManagerBackend.API.Infrastructure;
 using FinanceManagerBackend.API.Options;
 using FinanceManagerBackend.API.Services;
@@ -17,16 +19,17 @@ namespace FinanceManagerBackend.API.Configuration;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Configure entity repositories to DI. Entities are taken from BaseEntity namespace (`Domain/Entities`).
+    /// Configure entity repositories to DI.
+    /// Entities are taken from BaseEntity namespace (`Domain/Entities`).
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
     public static IServiceCollection ConfigureRepositories(this IServiceCollection services)
     {
-        var ns = typeof(BaseEntity).Namespace;
+        var ns = typeof(BaseEntity).Namespace!;
 
-        var entityTypes = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(x => x.Namespace == ns);
+        var entityTypes = GetUserDefinedTypesInNamespace(ns);
+        entityTypes.Remove(typeof(BaseEntity));
 
         foreach (var type in entityTypes)
         {
@@ -40,18 +43,17 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configure services to DI. Services are taken from IAuthService namespace (`Services`).
+    /// Configure services to DI.
+    /// Services are taken from IAuthService namespace (`Services`).
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
     /// <exception cref="NullReferenceException"></exception>
     public static IServiceCollection ConfigureServices(this IServiceCollection services)
     {
-        var ns = typeof(IAuthService).Namespace;
+        var ns = typeof(IAuthService).Namespace!;
 
-        var serviceTypes = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(x => x.Namespace == ns)
-            .ToList();
+        var serviceTypes = GetUserDefinedTypesInNamespace(ns);
 
         var interfaceTypes = serviceTypes
             .Where(x => x.IsInterface);
@@ -66,6 +68,37 @@ public static class ServiceCollectionExtensions
             }
 
             services.AddScoped(interfaceType, implementationType);
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configure exception handlers to DI.
+    /// Handlers are taken from ValidationExceptionHandler namespace (`HttpPipelines.ExceptionHandlers`).
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    public static IServiceCollection ConfigureExceptionHandlers(this IServiceCollection services)
+    {
+        var ns = typeof(GlobalExceptionHandler).Namespace!;
+
+        var handlerTypes = GetUserDefinedTypesInNamespace(ns);
+        // todo make it clear.
+        handlerTypes.Remove(typeof(GlobalExceptionHandler));
+        handlerTypes.Add(typeof(GlobalExceptionHandler));
+
+        var addHandlerMethod = typeof(ExceptionHandlerServiceCollectionExtensions)
+            .GetMethods()
+            .Single(x => x.Name == "AddExceptionHandler" &&
+                         x.IsGenericMethodDefinition &&
+                         x.GetParameters().Length == 1);
+
+        foreach (var handlerType in handlerTypes)
+        {
+            addHandlerMethod
+                .MakeGenericMethod(handlerType)
+                .Invoke(null, [services]);
         }
 
         return services;
@@ -92,7 +125,8 @@ public static class ServiceCollectionExtensions
             x.Issuer = authOptions.Issuer;
             x.Audience = authOptions.Audience;
             x.SecretKey = authOptions.SecretKey;
-            x.ExpirationTimeInMinutes = authOptions.ExpirationTimeInMinutes;
+            x.AccessTokenExpirationTimeInMinutes = authOptions.AccessTokenExpirationTimeInMinutes;
+            x.RefreshTokenExpirationTimeInMinutes = authOptions.RefreshTokenExpirationTimeInMinutes;
         });
 
         services
@@ -117,12 +151,26 @@ public static class ServiceCollectionExtensions
 
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = AuthHelper.GetSymmetricSecurityKey(authOptions.SecretKey),
+
+                    // Standard 5 minutes.
+                    ClockSkew = TimeSpan.FromMinutes(5)
                 };
 
                 // Disable automapping from sub to schema/.../nameidentifier
                 opt.MapInboundClaims = false;
             });
 
+        services.AddAuthorization();
+
         return services;
+    }
+
+    private static List<Type> GetUserDefinedTypesInNamespace(string ns)
+    {
+        var types = Assembly.GetExecutingAssembly().GetTypes()
+            .Where(x => x.Namespace == ns &&
+                        !x.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false));
+
+        return types.ToList();
     }
 }
