@@ -24,6 +24,12 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
     public DbSet<Category> Categories { get; set; }
 
     /// <summary>
+    /// Tags.
+    /// </summary>
+    /// todo
+    // public DbSet<Tag> Tags { get; set; }
+
+    /// <summary>
     /// Users.
     /// </summary>
     public DbSet<User> Users { get; set; }
@@ -36,9 +42,9 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
     {
         var dbHost = Environment.GetEnvironmentVariable("POSTGRES_HOST") ?? "localhost";
         var dbPort = Environment.GetEnvironmentVariable("POSTGRES_PORT") ?? "5432";
-        var dbName = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "fmb-app";
+        var dbName = Environment.GetEnvironmentVariable("POSTGRES_DB") ?? "fmb-db";
         var dbUsername = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
-        var dbPassword = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "postgres";
+        var dbPassword = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "myVeryStrongPassword123@456";
 
         optionsBuilder
             .UseNpgsql($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};")

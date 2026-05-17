@@ -1,5 +1,6 @@
 ﻿using Asp.Versioning;
 using FinanceManagerBackend.API.HttpPipelines;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceManagerBackend.API.Controllers;
@@ -9,6 +10,7 @@ namespace FinanceManagerBackend.API.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1")]
+[Authorize]
 [Route("api/v{version:apiVersion}/[controller]")]
 public class BaseController : ControllerBase
 {

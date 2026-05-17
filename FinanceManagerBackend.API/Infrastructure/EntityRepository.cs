@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace FinanceManagerBackend.API.Infrastructure;
 
 /// <inheritdoc />
-public class EntityRepository<TEntity>(ServiceDbContext context) : IEntityRepository<TEntity>
+public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityRepository<TEntity>> logger) : IEntityRepository<TEntity>
     where TEntity : BaseEntity
 {
     /// <inheritdoc />

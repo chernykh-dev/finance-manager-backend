@@ -112,7 +112,12 @@ public class TransactionController(
 
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
+        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+
+        await accountTransactionService.ReplaceAccountAmountAsync(entity, updatedEntity, cancellationToken);
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok();
     }
@@ -128,7 +133,12 @@ public class TransactionController(
             return NotFound();
         }
 
+        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+
+        await accountTransactionService.RollbackAccountAmountAsync(entity, cancellationToken);
         await transactionRepository.DeleteAsync(entity, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
 
         return Ok();
     }

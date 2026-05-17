@@ -1,6 +1,8 @@
-﻿namespace FinanceManagerBackend.API.Models.Tags;
+﻿using FinanceManagerBackend.API.Domain.Entities;
 
-public class TagResponse
+namespace FinanceManagerBackend.API.Models.Tags;
+
+public class TagResponse : Tag
 {
     
 }
