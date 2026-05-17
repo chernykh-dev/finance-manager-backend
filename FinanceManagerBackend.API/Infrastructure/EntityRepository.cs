@@ -112,10 +112,6 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
 
         var result = await context.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation($"result: {result}");
-
-        logger.LogInformation(context.Database.GetConnectionString());
-
         return entityEntry.Entity;
     }
 

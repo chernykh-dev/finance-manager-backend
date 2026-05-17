@@ -46,8 +46,6 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
         var dbUsername = Environment.GetEnvironmentVariable("POSTGRES_USER") ?? "postgres";
         var dbPassword = Environment.GetEnvironmentVariable("POSTGRES_PASSWORD") ?? "myVeryStrongPassword123@456";
 
-        Console.WriteLine($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};");
-
         optionsBuilder
             .UseNpgsql($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};")
             .UseLoggerFactory(loggerFactory)
