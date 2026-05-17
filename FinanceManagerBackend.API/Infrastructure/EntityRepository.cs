@@ -110,7 +110,7 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
             .Set<TEntity>()
             .AddAsync(entity, cancellationToken);
 
-        var result = await context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
 
         return entityEntry.Entity;
     }
