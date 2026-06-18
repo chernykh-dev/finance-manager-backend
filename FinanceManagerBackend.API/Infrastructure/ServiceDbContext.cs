@@ -35,6 +35,11 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
     public DbSet<User> Users { get; set; }
 
     /// <summary>
+    /// Transactions.
+    /// </summary>
+    public DbSet<Transaction> Transactions { get; set; }
+
+    /// <summary>
     /// Configure to localhost postgresql.
     /// </summary>
     /// <param name="optionsBuilder"></param>
