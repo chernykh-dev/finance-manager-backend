@@ -18,6 +18,9 @@ public static class HostExtensions
         using var scope = host.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ServiceDbContext>();
 
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Startup>>();
+
+        logger.LogInformation("Start to migrate db");
         context.Database.Migrate();
 
         /*
