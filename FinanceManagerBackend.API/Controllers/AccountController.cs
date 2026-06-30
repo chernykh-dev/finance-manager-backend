@@ -73,7 +73,10 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
             return Conflict();
         }
 
-        entity.Id = Guid.NewGuid();
+        if (entity.Id == Guid.Empty)
+        {
+            entity.Id = Guid.NewGuid();
+        }
         entity.UserId = userId;
         await accountRepository.CreateAsync(entity, cancellationToken);
 

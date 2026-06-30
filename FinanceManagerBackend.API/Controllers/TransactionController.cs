@@ -77,7 +77,10 @@ public class TransactionController(
 
         var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
-        entity.Id = Guid.NewGuid();
+        if (entity.Id == Guid.Empty)
+        {
+            entity.Id = Guid.NewGuid();
+        }
         await transactionRepository.CreateAsync(entity, cancellationToken);
 
         await accountTransactionService.UpdateAccountAmountAsync(entity, cancellationToken);

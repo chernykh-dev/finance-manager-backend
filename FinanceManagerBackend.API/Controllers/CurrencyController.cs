@@ -68,7 +68,10 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
             return Conflict();
         }
 
-        entity.Id = Guid.NewGuid();
+        if (entity.Id == Guid.Empty)
+        {
+            entity.Id = Guid.NewGuid();
+        }
         await currencyRepository.CreateAsync(entity, cancellationToken);
 
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<CurrencyResponse>());

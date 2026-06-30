@@ -10,7 +10,7 @@ public abstract class BaseEntity
     /// <summary>
     /// Entity id.
     /// </summary>
-    public Guid Id { get; set; }
+    public Guid Id { get; set; }/* todo = Guid.NewGuid();*/
 
     /// <summary>
     /// Entity created at.
