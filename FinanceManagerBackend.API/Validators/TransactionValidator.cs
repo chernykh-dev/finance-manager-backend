@@ -7,14 +7,14 @@ namespace FinanceManagerBackend.API.Validators;
 /// <summary>
 /// Validator for check transaction foreign keys.
 /// </summary>
-public class TransactionRelationsValidator : AbstractValidator<Transaction>
+public class TransactionValidator : AbstractValidator<Transaction>
 {
     /// <summary>
     /// Configure validation rules.
     /// </summary>
     /// <param name="accountRepository"></param>
     /// <param name="categoryRepository"></param>
-    public TransactionRelationsValidator(IEntityRepository<Account> accountRepository,
+    public TransactionValidator(IEntityRepository<Account> accountRepository,
         IEntityRepository<Category> categoryRepository)
     {
         RuleFor(x => x.AccountId)
@@ -34,5 +34,15 @@ public class TransactionRelationsValidator : AbstractValidator<Transaction>
                 return entity != null;
             })
             .WithMessage((transaction, id) => $"Category with id={transaction.CategoryId} not found");
+
+        RuleFor(x => x.Amount)
+            .NotEmpty()
+            .Must(x => x > 0)
+            .WithMessage("Amount must be positive");
+
+        RuleFor(x => x.Comment)
+            .Must(x => x!.Length < 200)
+            .When(x => !string.IsNullOrEmpty(x.Comment))
+            .WithMessage("Comment length must be less than 200");
     }
 }

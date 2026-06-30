@@ -83,7 +83,7 @@ public class Startup
         services.AddMapster();
         MapsterConfiguration.RegisterMappings();
 
-        services.AddValidatorsFromAssemblyContaining(typeof(AccountRelationsValidator));
+        services.AddValidatorsFromAssemblyContaining(typeof(AccountValidator));
 
         services.AddSwaggerGen(opt =>
         {
