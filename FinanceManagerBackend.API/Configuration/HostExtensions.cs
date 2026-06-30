@@ -17,12 +17,17 @@ public static class HostExtensions
     {
         using var scope = host.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ServiceDbContext>();
+
+        context.Database.Migrate();
+
+        /*
         var pendingMigrations = context.Database.GetPendingMigrations();
 
         if (pendingMigrations.Any())
         {
             context.Database.Migrate();
         }
+        */
 
         return host;
     }
