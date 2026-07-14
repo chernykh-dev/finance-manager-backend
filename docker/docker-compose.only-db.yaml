@@ -1,0 +1,21 @@
+﻿services:
+  fmb-db:
+    container_name: fmb-db
+    image: postgres:16
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: "fmb-db"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "myVeryStrongPassword123@456"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

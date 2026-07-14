@@ -1,7 +1,13 @@
-﻿using FinanceManagerBackend.API.Configuration;
+﻿using System.Buffers.Text;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using FinanceManagerBackend.API.Configuration;
 using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.HttpPipelines;
+using FinanceManagerBackend.API.Models.Auth.OAuth.Telegram;
+using FinanceManagerBackend.API.Models.Auth.OAuth.Yandex;
 using FinanceManagerBackend.API.Models.Users;
 using FinanceManagerBackend.API.Options;
 using FinanceManagerBackend.API.Services;
@@ -17,7 +23,7 @@ namespace FinanceManagerBackend.API.Controllers;
 /// </summary>
 /// <param name="userRepository"></param>
 /// <param name="authService"></param>
-public class AuthController(IEntityRepository<User> userRepository, IAuthService authService) : BaseController
+public class AuthController(IEntityRepository<User> userRepository, IAuthService authService, IHttpClientFactory httpClientFactory) : BaseController
 {
     /// <summary>
     /// Register new user.
@@ -73,6 +79,82 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
         await userRepository.UpdateAsync(entity, cancellationToken);
 
         return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("oauth/yandex")]
+    public async Task<ActionResult<AuthResponse>> YandexOAuthAsync([FromBody] YandexOAuthRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var httpClient = httpClientFactory.CreateClient();
+
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("OAuth", request.AccessToken);
+
+        var response = await httpClient.GetAsync("https://login.yandex.ru/info", cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Unauthorized();
+        }
+
+        var yandexUserInfo = await response.Content.ReadFromJsonAsync<YandexUserInfo>(new JsonSerializerOptions()
+            {
+                PropertyNameCaseInsensitive = true
+            },
+            cancellationToken);
+
+        if (yandexUserInfo == null)
+        {
+            // todo log.
+
+            return Unauthorized();
+        }
+
+        var user = await userRepository.GetByAsync(x => x.YandexId == yandexUserInfo.Id, cancellationToken);
+
+        var userExists = user != null;
+        user ??= new User()
+        {
+            Id = Guid.NewGuid(),
+            YandexId = yandexUserInfo.Id,
+            Name = yandexUserInfo.Login
+        };
+
+        var result = GenerateResultForUser(user);
+
+        if (userExists)
+        {
+            await userRepository.UpdateAsync(user, cancellationToken);
+        }
+        else
+        {
+            await userRepository.CreateAsync(user, cancellationToken);
+        }
+
+        return Ok(result);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("oauth/telegram")]
+    public async Task<ActionResult<AuthResponse>> TelegramOAuthAsync([FromBody] TelegramOAuthRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var token = "C-tosjdHH0u2KncYZc7uWyObVr0&state=sdfsgdf";
+
+        throw new NotImplementedException();
+    }
+
+    [AllowAnonymous]
+    [HttpPost("oauth/vk/test")]
+    public async Task<IActionResult> VkOAuthTestAsync(CancellationToken cancellationToken)
+    {
+        var url =
+            "https://id.vk.ru/authorize?response_type=code&client_id=54661363&scope=email&redirect_uri=http://localhost/vkoauth&state=XXXRandomZZZ&code_challenge=Ptoe139wP7uS_UvXMYxyz4mwmbd4MeoGwU99JkNktDI&code_challenge_method=S256";
+
+        var httpClient = httpClientFactory.CreateClient();
+
+        return Redirect(url);
     }
 
     /// <summary>

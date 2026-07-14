@@ -61,6 +61,8 @@ public class Startup
 
         services.AddDbContext<ServiceDbContext>();
 
+        services.AddHttpClient();
+
         services.ConfigureRepositories();
         services.ConfigureServices();
         services.ConfigureExceptionHandlers();

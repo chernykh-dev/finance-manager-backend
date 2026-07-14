@@ -16,7 +16,12 @@ public class User : BaseEntity
     /// <summary>
     /// User password.
     /// </summary>
-    public string Password { get; set; }
+    public string? Password { get; set; }
+
+    /// <summary>
+    /// Yandex Id (OAuth).
+    /// </summary>
+    public string? YandexId { get; set; }
 
     /// <summary>
     /// User auth refresh token.
