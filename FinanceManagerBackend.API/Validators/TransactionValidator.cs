@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Domain.Entities.Enums;
 using FluentValidation;
 
 namespace FinanceManagerBackend.API.Validators;
@@ -24,7 +25,14 @@ public class TransactionValidator : AbstractValidator<Transaction>
 
                 return entity != null;
             })
-            .WithMessage((transaction, id) => $"Account with id={transaction.AccountId} not found");
+            .WithMessage((transaction, id) => $"Account with id={transaction.AccountId} not found")
+            .MustAsync(async (accountId, cancellationToken) =>
+            {
+                var entity = await accountRepository.GetByIdReadonlyAsync(accountId, cancellationToken);
+
+                return entity != null && entity.Status != EStatus.Deleted;
+            })
+            .WithMessage((transaction, id) => $"Account with id={transaction.AccountId} is deleted");
 
         RuleFor(x => x.CategoryId)
             .MustAsync(async (categoryId, cancellationToken) =>

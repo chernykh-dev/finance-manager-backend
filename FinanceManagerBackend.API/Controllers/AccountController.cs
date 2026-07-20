@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Domain.Entities.Enums;
 using FinanceManagerBackend.API.Models.Accounts;
 using FluentValidation;
 using Mapster;
@@ -12,7 +13,9 @@ namespace FinanceManagerBackend.API.Controllers;
 /// </summary>
 /// <param name="accountRepository"></param>
 /// <param name="accountCommonValidator"></param>
-public class AccountController(IEntityRepository<Account> accountRepository, IValidator<Account> accountCommonValidator)
+public class AccountController(
+    IEntityRepository<Account> accountRepository, IEntityRepository<Transaction> transactionRepository,
+    IValidator<Account> accountCommonValidator)
     : BaseController
 {
     /// <summary>
@@ -25,7 +28,9 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
     {
         var userId = GetUserId();
 
-        var entities = await accountRepository.GetAllByReadonlyAsync(x => x.UserId == userId, cancellationToken);
+        var entities =
+            await accountRepository.GetAllByReadonlyAsync(x => x.UserId == userId && x.Status != EStatus.Deleted,
+                cancellationToken);
 
         return Ok(entities.Adapt<List<AccountResponse>>());
     }
@@ -122,14 +127,26 @@ public class AccountController(IEntityRepository<Account> accountRepository, IVa
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var entity = await accountRepository.GetByIdReadonlyAsync(id, cancellationToken);
+        var entity = await accountRepository.GetByIdAsync(id, cancellationToken);
 
         if (entity == null)
         {
             return NotFound();
         }
 
-        await accountRepository.DeleteAsync(entity, cancellationToken);
+        var firstTransaction = await transactionRepository.GetByReadonlyAsync(x => x.AccountId == id,
+            cancellationToken);
+
+        if (firstTransaction == null)
+        {
+            await accountRepository.DeleteAsync(entity, cancellationToken);
+        }
+        else
+        {
+            entity.Status = EStatus.Deleted;
+
+            await accountRepository.UpdateAsync(entity, cancellationToken);
+        }
 
         return Ok();
     }

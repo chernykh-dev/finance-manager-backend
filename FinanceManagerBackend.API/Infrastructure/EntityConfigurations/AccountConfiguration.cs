@@ -11,6 +11,10 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
     public void Configure(EntityTypeBuilder<Account> builder)
     {
         builder
+            .Property(x => x.Status)
+            .HasConversion<string>();
+
+        builder
             .HasOne<User>()
             .WithMany()
             .HasForeignKey(x => x.UserId)

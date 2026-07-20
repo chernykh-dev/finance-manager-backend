@@ -14,6 +14,8 @@ public static class MapsterConfiguration
     /// </summary>
     public static void RegisterMappings()
     {
+        TypeAdapterConfig.GlobalSettings.Default.EnumMappingStrategy(EnumMappingStrategy.ByName);
+
         /*
         todo
 

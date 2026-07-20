@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Domain.Entities.Enums;
 using FluentValidation;
 
 namespace FinanceManagerBackend.API.Validators;

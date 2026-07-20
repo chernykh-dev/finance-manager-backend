@@ -1,4 +1,6 @@
-﻿namespace FinanceManagerBackend.API.Domain.Entities;
+﻿using FinanceManagerBackend.API.Domain.Entities.Enums;
+
+namespace FinanceManagerBackend.API.Domain.Entities;
 
 /// <summary>
 /// Account entity.
@@ -24,4 +26,9 @@ public class Account : BaseEntity
     /// Account currency id.
     /// </summary>
     public Guid CurrencyId { get; set; }
+
+    /// <summary>
+    /// Account status.
+    /// </summary>
+    public EStatus Status { get; set; } = EStatus.Active;
 }
