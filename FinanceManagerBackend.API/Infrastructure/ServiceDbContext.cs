@@ -1,4 +1,5 @@
 ﻿using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Infrastructure.EntityConfigurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceManagerBackend.API.Infrastructure;
@@ -55,5 +56,12 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
             .UseNpgsql($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};")
             .UseLoggerFactory(loggerFactory)
             .UseSnakeCaseNamingConvention();
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AccountConfiguration).Assembly);
     }
 }

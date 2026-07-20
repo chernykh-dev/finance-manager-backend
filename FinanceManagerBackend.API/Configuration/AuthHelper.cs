@@ -15,6 +15,6 @@ public class AuthHelper
 
         data = SHA256.HashData(data);
 
-        return Encoding.UTF8.GetString(data);
+        return Convert.ToBase64String(data);
     }
 }

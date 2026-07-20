@@ -8,6 +8,21 @@ namespace FinanceManagerBackend.API.Infrastructure;
 public class DbInitializer
 {
     /// <summary>
+    /// Run currency id.
+    /// </summary>
+    public const string RubCurrencyId = "d67bdffe-9f2d-45e4-809a-c566f537dfb7";
+
+    /// <summary>
+    /// Usd currency id.
+    /// </summary>
+    public const string UsdCurrencyId = "0fbe774f-42fd-4814-b3c2-6ea659b4e595";
+
+    /// <summary>
+    /// Eur currency id.
+    /// </summary>
+    public const string EurCurrencyId = "e17d279c-4ac8-4679-894d-5b5f5caed741";
+
+    /// <summary>
     /// Initialize database required data.
     /// </summary>
     /// <param name="context"></param>
@@ -22,9 +37,9 @@ public class DbInitializer
         {
             var currencies = new List<Currency>()
             {
-                new Currency() { Id = Guid.Parse("d67bdffe-9f2d-45e4-809a-c566f537dfb7"), Name = "RUB", Symbol = "₽" },
-                new Currency() { Id = Guid.Parse("0fbe774f-42fd-4814-b3c2-6ea659b4e595"), Name = "USD", Symbol = "$" },
-                new Currency() { Id = Guid.Parse("e17d279c-4ac8-4679-894d-5b5f5caed741"), Name = "EUR", Symbol = "€" }
+                new Currency() { Id = Guid.Parse(RubCurrencyId), Code = "RUB", Symbol = "₽" },
+                new Currency() { Id = Guid.Parse(UsdCurrencyId), Code = "USD", Symbol = "$" },
+                new Currency() { Id = Guid.Parse(EurCurrencyId), Code = "EUR", Symbol = "€" }
             };
 
             foreach (var currency in currencies)

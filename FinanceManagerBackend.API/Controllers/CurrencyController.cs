@@ -62,7 +62,7 @@ public class CurrencyController(IEntityRepository<Currency> currencyRepository) 
     {
         var entity = request.Adapt<Currency>();
 
-        var entityWithName = await currencyRepository.GetByReadonlyAsync(x => x.Name == entity.Name, cancellationToken);
+        var entityWithName = await currencyRepository.GetByReadonlyAsync(x => x.Code == entity.Code, cancellationToken);
         if (entityWithName != null)
         {
             return Conflict();

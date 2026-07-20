@@ -211,6 +211,28 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
         return Ok(result);
     }
 
+    /// <summary>
+    /// Delete current user.
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpDelete]
+    public async Task<IActionResult> DeleteAsync(CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId();
+
+        var entity = await userRepository.GetByIdAsync(userId, cancellationToken);
+
+        if (entity == null)
+        {
+            return NotFound("User not found");
+        }
+
+        await userRepository.DeleteAsync(entity, cancellationToken);
+
+        return Ok();
+    }
+
     private AuthResponse GenerateResultForUser(User entity)
     {
         var result = new AuthResponse()

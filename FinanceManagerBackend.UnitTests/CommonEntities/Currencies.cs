@@ -7,6 +7,6 @@ public static class Currencies
     public static Currency RubCurrency => new()
     {
         Id = Ids.SampleId,
-        Name = "RUB"
+        Code = "RUB"
     };
 }
