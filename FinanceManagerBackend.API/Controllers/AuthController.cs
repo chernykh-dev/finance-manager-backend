@@ -66,8 +66,13 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
     {
         var entity =
             await userRepository.GetByAsync(
-                x => x.Name == credentials.Name && x.Password == AuthHelper.EncryptPassword(credentials.Password),
+                x => x.Name == credentials.Name,
                 cancellationToken);
+
+        if (!AuthHelper.VerifyPassword(credentials.Password, entity?.Password ?? ""))
+        {
+            entity = null;
+        }
 
         if (entity == null)
         {
