@@ -2,6 +2,7 @@
 using System.Diagnostics.Metrics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using FinanceManagerBackend.API.Exceptions;
@@ -120,15 +121,20 @@ public class Startup
             });
         });
 
-        services.AddControllers(opt =>
-        {
-            var policy = new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .RequireClaim(JwtRegisteredClaimNames.Sub)
-                .Build();
+        services
+            .AddControllers(opt =>
+            {
+                var policy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .RequireClaim(JwtRegisteredClaimNames.Sub)
+                    .Build();
 
-            opt.Filters.Add(new AuthorizeFilter(policy));
-        });
+                opt.Filters.Add(new AuthorizeFilter(policy));
+            })
+            .AddJsonOptions(opt =>
+            {
+                opt.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
 
         services.AddEndpointsApiExplorer();
 
