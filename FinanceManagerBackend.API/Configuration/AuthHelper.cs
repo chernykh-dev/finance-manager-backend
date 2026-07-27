@@ -26,8 +26,13 @@ public static class AuthHelper
     /// <summary>
     /// Verify input user password with stored encrypted password.
     /// </summary>
-    public static bool VerifyPassword(string password, string passwordHash)
+    public static bool VerifyPassword(string password, string? passwordHash)
     {
+        if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(passwordHash))
+        {
+            return false;
+        }
+
         return BCrypt.Net.BCrypt.Verify(password, passwordHash);
     }
 }

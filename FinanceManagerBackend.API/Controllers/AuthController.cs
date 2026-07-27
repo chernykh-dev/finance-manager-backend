@@ -69,12 +69,7 @@ public class AuthController(IEntityRepository<User> userRepository, IAuthService
                 x => x.Name == credentials.Name,
                 cancellationToken);
 
-        if (!AuthHelper.VerifyPassword(credentials.Password, entity?.Password ?? ""))
-        {
-            entity = null;
-        }
-
-        if (entity == null)
+        if (entity == null || !AuthHelper.VerifyPassword(credentials.Password, entity.Password))
         {
             return BadRequest("Username or password is incorrect");
         }

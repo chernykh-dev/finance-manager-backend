@@ -111,7 +111,7 @@ public class AccountController(
         var updatedEntity = request.Adapt<Account>();
         updatedEntity.Id = id;
 
-        await accountCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
+        await accountCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
         await accountRepository.UpdateAsync(updatedEntity, cancellationToken);
 
