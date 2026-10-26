@@ -51,7 +51,8 @@ public class AccountTransactionServiceTests : IDisposable
 
     public AccountTransactionServiceTests()
     {
-        _accountTransactionService = new AccountTransactionService(_accountMemoryRepository, _categoryMemoryRepository);
+        _accountTransactionService = new AccountTransactionService(
+            new AccountBalanceMemoryRepository(_accountMemoryRepository), _categoryMemoryRepository);
     }
 
     public void Dispose()

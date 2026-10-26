@@ -39,6 +39,8 @@ public static class ServiceCollectionExtensions
             services.AddScoped(interfaceType, implementationType);
         }
 
+        services.AddScoped<IAccountBalanceRepository, AccountBalanceRepository>();
+
         return services;
     }
 
