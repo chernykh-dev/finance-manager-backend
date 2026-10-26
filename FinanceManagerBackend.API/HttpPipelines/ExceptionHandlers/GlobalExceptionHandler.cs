@@ -21,9 +21,9 @@ public class GlobalExceptionHandler(
             Exception = exception,
             ProblemDetails = new ProblemDetails
             {
-                Type = exception.GetType().Name,
+                // Internal exception details are logged above and must not leak to the client.
                 Title = "An error occured",
-                Detail = exception.Message
+                Status = StatusCodes.Status500InternalServerError
             }
         });
     }
