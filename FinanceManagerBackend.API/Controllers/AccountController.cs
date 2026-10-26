@@ -51,6 +51,12 @@ public class AccountController(
             return NotFound();
         }
 
+        // Another user's account is reported exactly as a missing one.
+        if (entity.UserId != GetUserId())
+        {
+            return NotFound();
+        }
+
         return Ok(entity.Adapt<AccountResponse>());
     }
 
@@ -108,6 +114,11 @@ public class AccountController(
             return NotFound();
         }
 
+        if (entity.UserId != GetUserId())
+        {
+            return NotFound();
+        }
+
         var updatedEntity = request.Adapt<Account>();
         updatedEntity.Id = id;
 
@@ -130,6 +141,11 @@ public class AccountController(
         var entity = await accountRepository.GetByIdAsync(id, cancellationToken);
 
         if (entity == null)
+        {
+            return NotFound();
+        }
+
+        if (entity.UserId != GetUserId())
         {
             return NotFound();
         }
