@@ -1,10 +1,11 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Infrastructure.Specifications;
 
 namespace FinanceManagerBackend.API.Services;
 
 /// <inheritdoc />
-public class AccountTransactionService(IAccountBalanceRepository accountBalanceRepository, IEntityRepository<Category> categoryRepository) : IAccountTransactionService
+public class AccountTransactionService(IEntityRepository<Account> accountRepository, IEntityRepository<Category> categoryRepository) : IAccountTransactionService
 {
     /// <inheritdoc />
     public async Task UpdateAccountAmountAsync(Transaction transaction,
@@ -12,7 +13,7 @@ public class AccountTransactionService(IAccountBalanceRepository accountBalanceR
     {
         var delta = await GetBalanceDeltaAsync(transaction, cancellationToken);
 
-        await accountBalanceRepository.AddToBalanceAsync(transaction.AccountId, delta, cancellationToken);
+        await accountRepository.AddToBalanceAsync(transaction.AccountId, delta, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -29,7 +30,7 @@ public class AccountTransactionService(IAccountBalanceRepository accountBalanceR
     {
         var delta = await GetBalanceDeltaAsync(transaction, cancellationToken);
 
-        await accountBalanceRepository.AddToBalanceAsync(transaction.AccountId, -delta, cancellationToken);
+        await accountRepository.AddToBalanceAsync(transaction.AccountId, -delta, cancellationToken);
     }
 
     /// <summary>
