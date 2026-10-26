@@ -1,6 +1,7 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Domain.Entities.Enums;
+using FinanceManagerBackend.API.Exceptions;
 using FinanceManagerBackend.API.Models.Accounts;
 using FluentValidation;
 using Mapster;
@@ -56,6 +57,9 @@ public class AccountController(
 
     /// <summary>
     /// Create account.
+    /// Idempotent by id: a repeated request with an existing id and the same content returns
+    /// the stored account (200); different content returns 409.
+    /// 409 is also returned when another account of the user already has this name.
     /// </summary>
     /// <param name="request"></param>
     /// <param name="cancellationToken"></param>
@@ -68,6 +72,20 @@ public class AccountController(
 
         var entity = request.Adapt<Account>();
 
+        if (entity.Id == Guid.Empty)
+        {
+            entity.Id = Guid.NewGuid();
+        }
+        entity.UserId = userId;
+
+        // Must go before the name check: a replay of this very request would otherwise
+        // hit "name already taken" by the account it created itself.
+        var existing = await accountRepository.GetByIdReadonlyAsync(entity.Id, cancellationToken);
+        if (existing != null)
+        {
+            return Replay(existing, entity);
+        }
+
         await accountCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
 
         var entityWithName =
@@ -75,19 +93,45 @@ public class AccountController(
                 cancellationToken);
         if (entityWithName != null)
         {
-            return Conflict();
+            return Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "Account with this name already exists");
         }
 
-        if (entity.Id == Guid.Empty)
+        try
         {
-            entity.Id = Guid.NewGuid();
+            await accountRepository.CreateAsync(entity, cancellationToken);
         }
-        entity.UserId = userId;
-        await accountRepository.CreateAsync(entity, cancellationToken);
+        catch (EntityExistsException)
+        {
+            // A concurrent request with the same id won the insert.
+            existing = await accountRepository.GetRequiredByIdReadonlyAsync(entity.Id, cancellationToken);
+
+            return Replay(existing, entity);
+        }
 
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<AccountResponse>());
 
         return result;
+    }
+
+    private ActionResult<AccountResponse> Replay(Account existing, Account requested)
+    {
+        if (!IsSameContent(existing, requested))
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "Account with this id already exists with different content");
+        }
+
+        return Ok(existing.Adapt<AccountResponse>());
+    }
+
+    private static bool IsSameContent(Account existing, Account requested)
+    {
+        // Another user's account is reported as a plain conflict, without its content.
+        return existing.UserId == requested.UserId &&
+               existing.Name == requested.Name &&
+               existing.CurrencyId == requested.CurrencyId &&
+               existing.Balance == requested.Balance;
     }
 
     /// <summary>
