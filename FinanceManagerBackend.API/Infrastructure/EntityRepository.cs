@@ -176,6 +176,12 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
     /// <inheritdoc />
     public async Task<IDbContextTransaction> BeginTransaction(CancellationToken cancellationToken = default)
     {
+        // A request can already run inside a transaction (e.g. Idempotency-Key handling).
+        if (context.Database.CurrentTransaction is { } currentTransaction)
+        {
+            return await SavepointDbContextTransaction.CreateAsync(currentTransaction, cancellationToken);
+        }
+
         return await context.Database.BeginTransactionAsync(cancellationToken);
     }
 }
