@@ -85,6 +85,7 @@ public class Startup
         });
 
         services.ConfigureJobs();
+        services.ConfigureRedis();
 
         services.AddMapster();
         MapsterConfiguration.RegisterMappings();

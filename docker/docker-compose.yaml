@@ -9,12 +9,15 @@
     depends_on:
       fmb-db:
         condition: service_healthy
+      fmb-redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       POSTGRES_HOST: "fmb-db"
       POSTGRES_DB: "fmb-db"
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "myVeryStrongPassword123@456"
+      REDIS_HOST: "fmb-redis"
 
   fmb-db:
     container_name: fmb-db
@@ -30,6 +33,20 @@
       POSTGRES_PASSWORD: "myVeryStrongPassword123@456"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fmb-redis:
+    container_name: fmb-redis
+    image: redis:7.4-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    # Cache only (PostgreSQL holds the truth): no persistence, bounded memory, evict keys with TTL first.
+    command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5

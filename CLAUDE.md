@@ -26,6 +26,7 @@ dotnet test                       # unit-тесты (in-memory репозито�
 - Если установлен только .NET SDK новее 9, тесты запускаются с `DOTNET_ROLL_FORWARD=Major`.
 - Миграции: `dotnet ef migrations add <Name>` из `FinanceManagerBackend.API` (`dotnet-ef` 9.x). Применяются автоматически при старте приложения.
 - Unit-тесты не проверяют поведение PostgreSQL (транзакции, блокировки, уникальность). Изменения в этой области проверяй на запущенном API с локальным PostgreSQL (`docker/docker-compose.only-db.yaml` или локальный сервер; параметры — переменные `POSTGRES_*`, дефолты в `ServiceDbContext`). Интеграционные тесты — в #11.
+- Redis нужен для `Idempotency-Key` (поднимается тем же `docker/docker-compose.only-db.yaml`; параметры — `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, по умолчанию `localhost:6379`). Без Redis приложение стартует, но запросы с `Idempotency-Key` получают 503.
 - Пуш в `master` сразу собирает образы и деплоит (`.github/workflows/deploy.yml`), проверок на PR нет — проверяй до пуша.
 
 ## Код
@@ -33,3 +34,5 @@ dotnet test                       # unit-тесты (in-memory репозито�
 - Репозитории: generic `IEntityRepository<T>` (регистрируется автоматически для типов из `Domain/Entities`), специфичные операции — методами расширения в `Infrastructure/Specifications`. Известные проблемы схемы — #10.
 - Счета и транзакции принадлежат пользователю: проверяй владельца (`GetUserId()`), чужая сущность отвечает как отсутствующая.
 - Ошибки: доменные исключения обрабатываются в `HttpPipelines/ExceptionHandlers`; детали исключений наружу не отдаются.
+- Идемпотентность: `Idempotency-Key` обрабатывает `HttpPipelines/Idempotency/IdempotencyFilter` — Redis как быстрый слой (готовые ответы, блокировка «в процессе»), таблица `idempotency_keys` в PostgreSQL — источник истины в одной транзакции с операцией.
+- Фоновые задачи: Quartz-джобы с атрибутом `[CronJob("<cron>")]` регистрируются автоматически (`ConfigureJobs`).
