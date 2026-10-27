@@ -6,12 +6,14 @@ using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.HttpPipelines;
 using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
 using FinanceManagerBackend.API.Infrastructure;
+using FinanceManagerBackend.API.Infrastructure.Idempotency;
 using FinanceManagerBackend.API.Infrastructure.Scheduling;
 using FinanceManagerBackend.API.Options;
 using FinanceManagerBackend.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Quartz;
+using StackExchange.Redis;
 
 namespace FinanceManagerBackend.API.Configuration;
 
@@ -102,6 +104,36 @@ public static class ServiceCollectionExtensions
                 .MakeGenericMethod(handlerType)
                 .Invoke(null, [services]);
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configure Redis connection (REDIS_HOST, REDIS_PORT, REDIS_PASSWORD) and the idempotency cache.
+    /// The app starts and keeps reconnecting while Redis is down; operations fail fast meanwhile.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    public static IServiceCollection ConfigureRedis(this IServiceCollection services)
+    {
+        var options = new ConfigurationOptions
+        {
+            EndPoints =
+            {
+                {
+                    Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost",
+                    int.Parse(Environment.GetEnvironmentVariable("REDIS_PORT") ?? "6379")
+                }
+            },
+            Password = Environment.GetEnvironmentVariable("REDIS_PASSWORD"),
+            AbortOnConnectFail = false,
+            ConnectTimeout = 2000,
+            SyncTimeout = 1000,
+            AsyncTimeout = 1000
+        };
+
+        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(options));
+        services.AddSingleton<IIdempotencyCache, RedisIdempotencyCache>();
 
         return services;
     }

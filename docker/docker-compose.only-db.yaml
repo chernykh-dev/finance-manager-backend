@@ -17,5 +17,19 @@
       timeout: 5s
       retries: 5
 
+  fmb-redis:
+    container_name: fmb-redis
+    image: redis:7.4-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    # Cache only (PostgreSQL holds the truth): no persistence, bounded memory, evict keys with TTL first.
+    command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:

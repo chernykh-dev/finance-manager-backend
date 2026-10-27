@@ -24,14 +24,21 @@ namespace FinanceManagerBackend.API.HttpPipelines.Idempotency;
 /// | key exists, different request hash         | 409                                       |
 /// | key is held by a request still in progress  | 503 + Retry-After (must not be 4xx:       |
 /// |                                             | the client treats 4xx as terminal)        |
+/// | Redis is unavailable                        | handled by PostgreSQL alone (no fast path)|
 ///
-/// The key row and the action's effects are written in one DB transaction:
-/// either both are committed or neither is. Controllers that start their own transaction
-/// get a savepoint inside this one (see <see cref="EntityRepository{TEntity}.BeginTransaction"/>).
-/// 5xx results and unhandled exceptions roll everything back, so the key can be retried.
+/// Two layers:
+/// - Redis (<see cref="IIdempotencyCache"/>): fast path. A completed response is replayed without touching
+///   PostgreSQL; an in-flight request holds a short lock, so concurrent duplicates get 503 immediately.
+///   Redis may lose data or be down at any time, nothing relies on it for correctness: without it requests
+///   go straight to PostgreSQL.
+/// - PostgreSQL (idempotency_keys): source of truth. The key row and the action's effects are written in one
+///   DB transaction: either both are committed or neither is. Controllers that start their own transaction
+///   get a savepoint inside this one (see <see cref="EntityRepository{TEntity}.BeginTransaction"/>).
+///   5xx results and unhandled exceptions roll everything back, so the key can be retried.
 /// </summary>
 public class IdempotencyFilter(
     ServiceDbContext context,
+    IIdempotencyCache cache,
     IOptions<JsonOptions> jsonOptions,
     ILogger<IdempotencyFilter> logger
 ) : IAsyncActionFilter
@@ -50,6 +57,12 @@ public class IdempotencyFilter(
     /// How long a request waits for another in-flight request with the same key.
     /// </summary>
     private const string LockTimeout = "5s";
+
+    /// <summary>
+    /// Redis "in progress" lock lifetime: longer than any normal request. If a request outlives it,
+    /// the PostgreSQL row lock (<see cref="LockTimeout"/>) still keeps duplicates out.
+    /// </summary>
+    private static readonly TimeSpan InProgressLockTimeToLive = TimeSpan.FromSeconds(30);
 
     private const int RetryAfterSeconds = 2;
 
@@ -84,9 +97,56 @@ public class IdempotencyFilter(
 
         var requestHash = await ComputeRequestHashAsync(request, cancellationToken);
 
+        string? lockToken;
+        try
+        {
+            var cached = await cache.GetAsync(userId, key);
+            if (cached != null)
+            {
+                actionContext.Result = Replay(httpContext, cached, requestHash);
+                return;
+            }
+
+            lockToken = await cache.TryAcquireLockAsync(userId, key, InProgressLockTimeToLive);
+
+            if (lockToken == null)
+            {
+                logger.LogInformation("Request with {Header}={Key} is still in progress", HeaderName, key);
+
+                actionContext.Result = InProgress(httpContext);
+                return;
+            }
+        }
+        catch (IdempotencyCacheUnavailableException exception)
+        {
+            // No fast path: PostgreSQL alone still guarantees one effect per key
+            // (its row lock makes a concurrent duplicate wait, then replay or 503).
+            logger.LogWarning(exception, "Idempotency cache is unavailable, using PostgreSQL only");
+
+            await ExecuteAsync(actionContext, next, userId, key, requestHash, useCache: false, cancellationToken);
+            return;
+        }
+
+        try
+        {
+            await ExecuteAsync(actionContext, next, userId, key, requestHash, useCache: true, cancellationToken);
+        }
+        finally
+        {
+            await TryCacheAsync(() => cache.ReleaseLockAsync(userId, key, lockToken));
+        }
+    }
+
+    private async Task ExecuteAsync(ActionExecutingContext actionContext, ActionExecutionDelegate next,
+        Guid userId, string key, string requestHash, bool useCache, CancellationToken cancellationToken)
+    {
+        var httpContext = actionContext.HttpContext;
+
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
 
         await context.Database.ExecuteSqlRawAsync($"SET LOCAL lock_timeout = '{LockTimeout}'", cancellationToken);
+
+        var createdAt = DateTimeOffset.UtcNow;
 
         int inserted;
         try
@@ -95,7 +155,7 @@ public class IdempotencyFilter(
             inserted = await context.Database.ExecuteSqlAsync(
                 $"""
                  INSERT INTO idempotency_keys (user_id, key, request_hash, created_at)
-                 VALUES ({userId}, {key}, {requestHash}, {DateTimeOffset.UtcNow})
+                 VALUES ({userId}, {key}, {requestHash}, {createdAt})
                  ON CONFLICT (user_id, key) DO NOTHING
                  """,
                 cancellationToken);
@@ -110,11 +170,32 @@ public class IdempotencyFilter(
 
         if (inserted == 0)
         {
+            // Not in the cache (evicted, Redis restarted, or the cache write failed), but PostgreSQL has it.
             var record = await context.IdempotencyRecords
                 .AsNoTracking()
                 .SingleAsync(x => x.UserId == userId && x.Key == key, cancellationToken);
 
-            actionContext.Result = Replay(httpContext, record, requestHash);
+            if (record.RequestHash != requestHash)
+            {
+                actionContext.Result = DifferentRequest();
+                return;
+            }
+
+            if (record.ResponseStatusCode == null)
+            {
+                actionContext.Result = InProgress(httpContext);
+                return;
+            }
+
+            var stored = new IdempotencyResponse(record.RequestHash, record.ResponseStatusCode.Value,
+                record.ResponseContentType, record.ResponseBody);
+
+            if (useCache)
+            {
+                await CacheResponseAsync(userId, key, stored, record.CreatedAt);
+            }
+
+            actionContext.Result = Replay(httpContext, stored, requestHash);
             return;
         }
 
@@ -142,30 +223,63 @@ public class IdempotencyFilter(
                 cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+
+        // After commit only: the cache must never hold a response PostgreSQL doesn't have.
+        if (useCache)
+        {
+            await CacheResponseAsync(userId, key,
+                new IdempotencyResponse(requestHash, statusCode, contentType, body), createdAt);
+        }
     }
 
-    private IActionResult Replay(HttpContext httpContext, IdempotencyRecord record, string requestHash)
+    private async Task CacheResponseAsync(Guid userId, string key, IdempotencyResponse response,
+        DateTimeOffset createdAt)
     {
-        if (record.RequestHash != requestHash)
-        {
-            // Client bug: one key must always carry the same request.
-            return Problem(StatusCodes.Status409Conflict,
-                $"{HeaderName} was already used with a different request");
-        }
+        var timeToLive = createdAt + IdempotencyKeyCleanupJob.KeyTimeToLive - DateTimeOffset.UtcNow;
 
-        if (record.ResponseStatusCode == null)
+        if (timeToLive > TimeSpan.Zero)
         {
-            return InProgress(httpContext);
+            await TryCacheAsync(() => cache.SetAsync(userId, key, response, timeToLive));
+        }
+    }
+
+    /// <summary>
+    /// Cache writes after the decision is made are best effort: PostgreSQL already holds the truth,
+    /// and an unreleased lock expires by itself.
+    /// </summary>
+    private async Task TryCacheAsync(Func<Task> operation)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (IdempotencyCacheUnavailableException exception)
+        {
+            logger.LogWarning(exception, "Idempotency cache write failed");
+        }
+    }
+
+    private static IActionResult Replay(HttpContext httpContext, IdempotencyResponse stored, string requestHash)
+    {
+        if (stored.RequestHash != requestHash)
+        {
+            return DifferentRequest();
         }
 
         httpContext.Response.Headers[ReplayedHeaderName] = "true";
 
         return new ContentResult
         {
-            StatusCode = record.ResponseStatusCode,
-            ContentType = record.ResponseContentType,
-            Content = record.ResponseBody
+            StatusCode = stored.StatusCode,
+            ContentType = stored.ContentType,
+            Content = stored.Body
         };
+    }
+
+    private static IActionResult DifferentRequest()
+    {
+        // Client bug: one key must always carry the same request.
+        return Problem(StatusCodes.Status409Conflict, $"{HeaderName} was already used with a different request");
     }
 
     private static IActionResult InProgress(HttpContext httpContext)
