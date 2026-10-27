@@ -1,10 +1,10 @@
 ﻿using System.Linq.Expressions;
-using System.Reflection;
 using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Exceptions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FinanceManagerBackend.API.Infrastructure;
@@ -157,51 +157,28 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
     public async Task<bool> IncrementAsync(Guid id, Expression<Func<TEntity, decimal>> property, decimal delta,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        // Table/column names come from the EF model (not user input) and are quoted by the provider;
+        // values go as parameters.
+        var entityType = context.Model.FindEntityType(typeof(TEntity))!;
+        var table = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
+        var sqlHelper = context.GetService<ISqlGenerationHelper>();
 
-        // UPDATE ... SET property = property + @delta, updated_at = @now WHERE id = @id
-        // Runs inside the current DB transaction (if any) and takes a row lock until it ends.
-        var affected = await context
-            .Set<TEntity>()
-            .Where(e => e.Id == id)
-            .ExecuteUpdateAsync(BuildIncrementSetters(property, delta, now), cancellationToken);
+        string Column(string propertyName) =>
+            sqlHelper.DelimitIdentifier(entityType.FindProperty(propertyName)!.GetColumnName(table)!);
+
+        var column = Column(((MemberExpression)property.Body).Member.Name);
+
+        // Single statement: runs inside the current DB transaction (if any) and takes a row lock until it ends.
+        var affected = await context.Database.ExecuteSqlRawAsync(
+            $$"""
+              UPDATE {{sqlHelper.DelimitIdentifier(table.Name, table.Schema)}}
+              SET {{column}} = {{column}} + {0}, {{Column(nameof(BaseEntity.UpdatedAt))}} = {1}
+              WHERE {{Column(nameof(BaseEntity.Id))}} = {2}
+              """,
+            [delta, DateTimeOffset.UtcNow, id],
+            cancellationToken);
 
         return affected > 0;
-    }
-
-    /// <summary>
-    /// Builds s => s.SetProperty(property, x => property(x) + delta).SetProperty(x => x.UpdatedAt, x => now).
-    /// Written by hand because the property is a parameter, and ExecuteUpdate takes setters only as an expression tree.
-    /// </summary>
-    private static Expression<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>> BuildIncrementSetters(
-        Expression<Func<TEntity, decimal>> property, decimal delta, DateTimeOffset now)
-    {
-        // Captured like a closure variable, so EF sends delta as a query parameter rather than a SQL literal.
-        Expression<Func<decimal>> deltaValue = () => delta;
-        var incremented = Expression.Lambda<Func<TEntity, decimal>>(
-            Expression.Add(property.Body, deltaValue.Body), property.Parameters);
-
-        Expression<Func<TEntity, DateTimeOffset>> updatedAt = x => x.UpdatedAt;
-        Expression<Func<TEntity, DateTimeOffset>> updatedAtValue = x => now;
-
-        var setters = Expression.Parameter(typeof(SetPropertyCalls<TEntity>), "s");
-
-        var body = Expression.Call(
-            Expression.Call(setters, SetPropertyMethod<decimal>(), property, incremented),
-            SetPropertyMethod<DateTimeOffset>(), updatedAt, updatedAtValue);
-
-        return Expression.Lambda<Func<SetPropertyCalls<TEntity>, SetPropertyCalls<TEntity>>>(body, setters);
-    }
-
-    private static MethodInfo SetPropertyMethod<TProperty>()
-    {
-        // SetProperty<TProperty>(Func<TEntity, TProperty> propertyExpression, Func<TEntity, TProperty> valueExpression)
-        return typeof(SetPropertyCalls<TEntity>)
-            .GetMethods()
-            .Single(x => x.Name == nameof(SetPropertyCalls<TEntity>.SetProperty) &&
-                         x.GetParameters()[1].ParameterType.IsGenericType &&
-                         x.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(Func<,>))
-            .MakeGenericMethod(typeof(TProperty));
     }
 
     /// <inheritdoc />
