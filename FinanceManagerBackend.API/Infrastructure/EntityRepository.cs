@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
+using Npgsql;
 
 namespace FinanceManagerBackend.API.Infrastructure;
 
@@ -112,7 +113,18 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
             .Set<TEntity>()
             .AddAsync(entity, cancellationToken);
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsPrimaryKeyViolation(exception))
+        {
+            // The check above is only a fast path: a concurrent request with the same id
+            // can insert between AnyAsync and SaveChanges. The primary key is the real guard.
+            entityEntry.State = EntityState.Detached;
+
+            throw new EntityExistsException(typeof(TEntity));
+        }
 
         return entityEntry.Entity;
     }
@@ -151,6 +163,16 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
         context.Set<TEntity>().Remove(entity);
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private bool IsPrimaryKeyViolation(DbUpdateException exception)
+    {
+        var primaryKeyName = context.Model.FindEntityType(typeof(TEntity))?.FindPrimaryKey()?.GetName();
+
+        return exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        } postgresException && postgresException.ConstraintName == primaryKeyName;
     }
 
     /// <inheritdoc />

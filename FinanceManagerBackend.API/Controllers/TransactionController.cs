@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Exceptions;
 using FinanceManagerBackend.API.Infrastructure.Specifications;
 using FinanceManagerBackend.API.Models.Transactions;
 using FinanceManagerBackend.API.Services;
@@ -77,6 +78,8 @@ public class TransactionController(
 
     /// <summary>
     /// Create new transaction.
+    /// Idempotent by id: a repeated request with an existing id and the same content returns
+    /// the stored transaction (200) without applying the amount again; different content returns 409.
     /// </summary>
     /// <param name="request"></param>
     /// <param name="cancellationToken"></param>
@@ -87,17 +90,40 @@ public class TransactionController(
     {
         var entity = request.Adapt<Transaction>();
 
+        // Must go before the replay check: a replay must never return another user's transaction.
         await ThrowIfNotOwnAccountAsync(entity.AccountId, cancellationToken);
-
-        await transactionCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
-
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         if (entity.Id == Guid.Empty)
         {
             entity.Id = Guid.NewGuid();
         }
-        await transactionRepository.CreateAsync(entity, cancellationToken);
+
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+
+        // Replay check goes first and must return before UpdateAccountAmountAsync:
+        // the balance is changed by delta, applying it twice corrupts the account.
+        var existing = await transactionRepository.GetByIdReadonlyAsync(entity.Id, cancellationToken);
+        if (existing != null)
+        {
+            return Replay(existing, entity);
+        }
+
+        await transactionCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
+
+        try
+        {
+            await transactionRepository.CreateAsync(entity, cancellationToken);
+        }
+        catch (EntityExistsException)
+        {
+            // A concurrent request with the same id won the insert. The DB transaction is aborted,
+            // so roll back and read its committed result.
+            await transaction.RollbackAsync(cancellationToken);
+
+            existing = await transactionRepository.GetRequiredByIdReadonlyAsync(entity.Id, cancellationToken);
+
+            return Replay(existing, entity);
+        }
 
         await accountTransactionService.UpdateAccountAmountAsync(entity, cancellationToken);
 
@@ -106,6 +132,27 @@ public class TransactionController(
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<TransactionResponse>());
 
         return result;
+    }
+
+    private ActionResult<TransactionResponse> Replay(Transaction existing, Transaction requested)
+    {
+        if (!IsSameContent(existing, requested))
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "Transaction with this id already exists with different content");
+        }
+
+        return Ok(existing.Adapt<TransactionResponse>());
+    }
+
+    private static bool IsSameContent(Transaction existing, Transaction requested)
+    {
+        return existing.AccountId == requested.AccountId &&
+               existing.CategoryId == requested.CategoryId &&
+               existing.Amount == requested.Amount &&
+               // PostgreSQL stores timestamps with microsecond precision.
+               existing.DateTime.UtcTicks / 10 == requested.DateTime.UtcTicks / 10 &&
+               existing.Comment == requested.Comment;
     }
 
     /// <summary>
