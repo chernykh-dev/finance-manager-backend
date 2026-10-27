@@ -9,7 +9,6 @@ using FinanceManagerBackend.API.Exceptions;
 using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
 using FinanceManagerBackend.API.HttpPipelines.Idempotency;
 using FinanceManagerBackend.API.Infrastructure;
-using FinanceManagerBackend.API.Infrastructure.Idempotency;
 using FinanceManagerBackend.API.Validators;
 using FluentValidation;
 using Mapster;
@@ -20,7 +19,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-using Quartz;
 
 namespace FinanceManagerBackend.API.Configuration;
 
@@ -86,16 +84,7 @@ public class Startup
             };
         });
 
-        services.AddQuartz(opt =>
-        {
-            opt.AddJob<IdempotencyKeyCleanupJob>(IdempotencyKeyCleanupJob.Key);
-            opt.AddTrigger(trigger => trigger
-                .ForJob(IdempotencyKeyCleanupJob.Key)
-                .WithIdentity($"{IdempotencyKeyCleanupJob.Key.Name}-trigger")
-                .WithCronSchedule(IdempotencyKeyCleanupJob.CronSchedule)
-                .StartNow());
-        });
-        services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
+        services.ConfigureJobs();
 
         services.AddMapster();
         MapsterConfiguration.RegisterMappings();
