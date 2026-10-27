@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
+using FinanceManagerBackend.API.Infrastructure.Specifications;
 
 namespace FinanceManagerBackend.API.Services;
 
@@ -10,20 +11,9 @@ public class AccountTransactionService(IEntityRepository<Account> accountReposit
     public async Task UpdateAccountAmountAsync(Transaction transaction,
         CancellationToken cancellationToken = default)
     {
-        var account = await accountRepository.GetRequiredByIdAsync(transaction.AccountId, cancellationToken);
+        var delta = await GetBalanceDeltaAsync(transaction, cancellationToken);
 
-        var category = await categoryRepository.GetRequiredByIdReadonlyAsync(transaction.CategoryId, cancellationToken);
-
-        if (category.IsIncome)
-        {
-            account.Balance += transaction.Amount;
-        }
-        else
-        {
-            account.Balance -= transaction.Amount;
-        }
-
-        await accountRepository.UpdateAsync(account, cancellationToken);
+        await accountRepository.AddToBalanceAsync(transaction.AccountId, delta, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -38,18 +28,18 @@ public class AccountTransactionService(IEntityRepository<Account> accountReposit
     public async Task RollbackAccountAmountAsync(Transaction transaction,
         CancellationToken cancellationToken = default)
     {
-        var account = await accountRepository.GetRequiredByIdAsync(transaction.AccountId, cancellationToken);
+        var delta = await GetBalanceDeltaAsync(transaction, cancellationToken);
+
+        await accountRepository.AddToBalanceAsync(transaction.AccountId, -delta, cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns signed balance change of transaction: +amount for income, -amount for expense.
+    /// </summary>
+    private async Task<decimal> GetBalanceDeltaAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
         var category = await categoryRepository.GetRequiredByIdReadonlyAsync(transaction.CategoryId, cancellationToken);
 
-        if (category.IsIncome)
-        {
-            account.Balance -= transaction.Amount;
-        }
-        else
-        {
-            account.Balance += transaction.Amount;
-        }
-
-        await accountRepository.UpdateAsync(account, cancellationToken);
+        return category.IsIncome ? transaction.Amount : -transaction.Amount;
     }
 }
