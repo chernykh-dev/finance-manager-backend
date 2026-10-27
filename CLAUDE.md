@@ -28,6 +28,7 @@ dotnet test                       # unit-тесты (in-memory репозито�
 - Unit-тесты не проверяют поведение PostgreSQL (транзакции, блокировки, уникальность). Изменения в этой области проверяй на запущенном API с локальным PostgreSQL (`docker/docker-compose.only-db.yaml` или локальный сервер; параметры — переменные `POSTGRES_*`, дефолты в `ServiceDbContext`). Интеграционные тесты — в #11.
 - Redis — быстрый слой для `Idempotency-Key` (поднимается тем же `docker/docker-compose.only-db.yaml`; параметры — `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, по умолчанию `localhost:6379`). Без Redis всё работает через PostgreSQL, только без быстрого пути.
 - Пуш в `master` сразу собирает образы и деплоит (`.github/workflows/deploy.yml`), проверок на PR нет — проверяй до пуша.
+- Стенд для PR: метка `preview` → `http://fmb-<N>.yourflow.pro` (`db-copy` — с копией основной базы). Подробности — `docs/preview-stands.md`.
 
 ## Код
 

@@ -1,0 +1,232 @@
+name: Preview stand
+
+# Per-PR preview stands at http://fmb-<N>.yourflow.pro (see docs/preview-stands.md).
+# - label "preview": create the stand, update it on every push; remove the label -> stand removed
+# - label "db-copy" (with "preview"): the stand's database starts as a copy of the main one
+# - closing / merging the PR removes the stand
+# - Actions -> "Preview stand" -> Run workflow: create / update / recreate a stand by PR number
+
+on:
+  pull_request:
+    types: [ labeled, unlabeled, synchronize, reopened, closed ]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number
+        required: true
+        type: number
+      db_copy:
+        description: Recreate the stand's database as a copy of the main one
+        type: boolean
+        default: false
+      reset:
+        description: Recreate the stand's database empty
+        type: boolean
+        default: false
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+env:
+  IMAGE_API: ghcr.io/chernykh-dev/fmb-api
+  PREVIEW_PATH: /var/www/fmb/preview
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.plan.outputs.action }}
+      pr: ${{ steps.plan.outputs.pr }}
+      ref: ${{ steps.plan.outputs.ref }}
+      flags: ${{ steps.plan.outputs.flags }}
+    steps:
+      - name: Decide what to do
+        id: plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const PREVIEW = 'preview';
+            const DB_COPY = 'db-copy';
+
+            let pr, ref, labels;
+            let action = 'skip';
+            const flags = [];
+
+            if (context.eventName === 'workflow_dispatch') {
+              pr = Number(context.payload.inputs.pr);
+              const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: pr });
+              if (data.state !== 'open') {
+                core.setFailed(`PR #${pr} is not open`);
+                return;
+              }
+              ref = data.head.sha;
+              action = 'deploy';
+              if (context.payload.inputs.db_copy === 'true') {
+                flags.push('--reset', '--db-copy');
+              } else if (context.payload.inputs.reset === 'true') {
+                flags.push('--reset');
+              }
+            } else {
+              const payload = context.payload.pull_request;
+              pr = payload.number;
+              ref = payload.head.sha;
+              labels = payload.labels.map(l => l.name);
+              const label = context.payload.label?.name;
+              const hasPreview = labels.includes(PREVIEW);
+
+              // Secrets are not available to PRs from forks.
+              if (payload.head.repo.full_name !== payload.base.repo.full_name) {
+                core.notice('PR from a fork: preview stands are not supported');
+              } else if (context.payload.action === 'closed') {
+                action = 'teardown';
+              } else if (context.payload.action === 'unlabeled') {
+                if (label === PREVIEW) action = 'teardown';
+              } else if (context.payload.action === 'labeled') {
+                if (label === PREVIEW) {
+                  action = 'deploy';
+                } else if (label === DB_COPY && hasPreview) {
+                  // db-copy added to a running stand: recreate its database from the copy.
+                  action = 'deploy';
+                  flags.push('--reset');
+                }
+              } else if (hasPreview) {
+                // synchronize / reopened
+                action = 'deploy';
+              }
+
+              // preview.sh copies only into a fresh database, so this never overwrites stand data.
+              if (action === 'deploy' && labels.includes(DB_COPY)) flags.push('--db-copy');
+            }
+
+            core.info(`PR #${pr}: ${action} ${flags.join(' ')}`);
+            core.setOutput('action', action);
+            core.setOutput('pr', String(pr));
+            core.setOutput('ref', ref);
+            core.setOutput('flags', flags.join(' '));
+
+  deploy:
+    needs: plan
+    if: needs.plan.outputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push API
+        uses: docker/build-push-action@v5
+        with:
+          context: ./FinanceManagerBackend.API
+          push: true
+          tags: ${{ env.IMAGE_API }}:pr-${{ needs.plan.outputs.pr }}
+
+      - name: Copy stand files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: docker/docker-compose.preview.yaml,docker/preview.sh
+          target: ${{ env.PREVIEW_PATH }}
+          strip_components: 1
+
+      - name: Start stand
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: bash ${{ env.PREVIEW_PATH }}/preview.sh up ${{ needs.plan.outputs.pr }} ${{ needs.plan.outputs.flags }}
+
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PR: ${{ needs.plan.outputs.pr }}
+          REF: ${{ needs.plan.outputs.ref }}
+          FLAGS: ${{ needs.plan.outputs.flags }}
+          OUTCOME: ${{ job.status }}
+        with:
+          script: |
+            const pr = Number(process.env.PR);
+            const url = `http://fmb-${pr}.yourflow.pro`;
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const sha = process.env.REF.substring(0, 7);
+            const data = process.env.FLAGS.includes('--db-copy') ? 'копия основной базы' : 'пустая база';
+            const body = process.env.OUTCOME === 'success'
+              ? `🟢 **Стенд поднят:** ${url} · Swagger: ${url}/swagger\n\nКоммит \`${sha}\`, данные: ${data}. Обновляется с каждым пушем, удаляется при снятии метки \`preview\` или закрытии PR. [Лог](${run})`
+              : `🔴 **Стенд не поднялся** (коммит \`${sha}\`). Возможная причина — лимит одновременных стендов. [Лог](${run})`;
+            await upsertComment(pr, body);
+
+            async function upsertComment(issue_number, text) {
+              const marker = '<!-- fmb-preview -->';
+              const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number });
+              const existing = comments.find(c => c.body?.includes(marker));
+              const full = `${marker}\n${text}`;
+              if (existing) {
+                await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body: full });
+              } else {
+                await github.rest.issues.createComment({ ...context.repo, issue_number, body: full });
+              }
+            }
+
+  teardown:
+    needs: plan
+    if: needs.plan.outputs.action == 'teardown'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - name: Copy stand files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: docker/docker-compose.preview.yaml,docker/preview.sh
+          target: ${{ env.PREVIEW_PATH }}
+          strip_components: 1
+
+      - name: Remove stand
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: bash ${{ env.PREVIEW_PATH }}/preview.sh down ${{ needs.plan.outputs.pr }}
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        env:
+          PR: ${{ needs.plan.outputs.pr }}
+        with:
+          script: |
+            const issue_number = Number(process.env.PR);
+            const marker = '<!-- fmb-preview -->';
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number });
+            const existing = comments.find(c => c.body?.includes(marker));
+            // Nothing to report if the stand was never created.
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body: `${marker}\n⚪ Стенд \`fmb-${issue_number}\` удалён вместе с данными.`
+              });
+            }
