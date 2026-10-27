@@ -120,6 +120,7 @@ public class AccountController(
 
     /// <summary>
     /// Delete account.
+    /// Idempotent: deleting a missing account is a success (204).
     /// </summary>
     /// <param name="id"></param>
     /// <param name="cancellationToken"></param>
@@ -131,7 +132,7 @@ public class AccountController(
 
         if (entity == null)
         {
-            return NotFound();
+            return NoContent();
         }
 
         var firstTransaction = await transactionRepository.GetByReadonlyAsync(x => x.AccountId == id,
@@ -148,6 +149,6 @@ public class AccountController(
             await accountRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        return Ok();
+        return NoContent();
     }
 }
