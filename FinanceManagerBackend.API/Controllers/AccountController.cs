@@ -110,6 +110,10 @@ public class AccountController(
 
         var updatedEntity = request.Adapt<Account>();
         updatedEntity.Id = id;
+        // Not part of the request: keep the stored values instead of the entity defaults.
+        updatedEntity.UserId = entity.UserId;
+        updatedEntity.Status = entity.Status;
+        updatedEntity.CreatedAt = entity.CreatedAt;
 
         await accountCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 

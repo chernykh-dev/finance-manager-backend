@@ -112,10 +112,12 @@ public class TransactionController(
 
         var updatedEntity = request.Adapt<Transaction>();
         updatedEntity.Id = id;
+        // Not part of the request: keep the stored value instead of the entity default (now).
+        updatedEntity.CreatedAt = entity.CreatedAt;
 
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.ReplaceAccountAmountAsync(entity, updatedEntity, cancellationToken);
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
