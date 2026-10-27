@@ -121,6 +121,10 @@ public class AccountController(
 
         var updatedEntity = request.Adapt<Account>();
         updatedEntity.Id = id;
+        // Not part of the request: keep the stored values instead of the entity defaults.
+        updatedEntity.UserId = entity.UserId;
+        updatedEntity.Status = entity.Status;
+        updatedEntity.CreatedAt = entity.CreatedAt;
 
         await accountCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
@@ -131,6 +135,7 @@ public class AccountController(
 
     /// <summary>
     /// Delete account.
+    /// Idempotent: deleting a missing account is a success (204).
     /// </summary>
     /// <param name="id"></param>
     /// <param name="cancellationToken"></param>
@@ -142,12 +147,13 @@ public class AccountController(
 
         if (entity == null)
         {
-            return NotFound();
+            return NoContent();
         }
 
+        // Another user's account is reported exactly as a missing one.
         if (entity.UserId != GetUserId())
         {
-            return NotFound();
+            return NoContent();
         }
 
         var firstTransaction = await transactionRepository.GetByReadonlyAsync(x => x.AccountId == id,
@@ -164,6 +170,6 @@ public class AccountController(
             await accountRepository.UpdateAsync(entity, cancellationToken);
         }
 
-        return Ok();
+        return NoContent();
     }
 }

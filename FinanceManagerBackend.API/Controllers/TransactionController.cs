@@ -133,13 +133,15 @@ public class TransactionController(
 
         var updatedEntity = request.Adapt<Transaction>();
         updatedEntity.Id = id;
+        // Not part of the request: keep the stored value instead of the entity default (now).
+        updatedEntity.CreatedAt = entity.CreatedAt;
 
         // The transaction may be moved to another account: it must be the user's too.
         await ThrowIfNotOwnAccountAsync(updatedEntity.AccountId, cancellationToken);
 
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.ReplaceAccountAmountAsync(entity, updatedEntity, cancellationToken);
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
@@ -149,6 +151,13 @@ public class TransactionController(
         return Ok();
     }
 
+    /// <summary>
+    /// Delete transaction.
+    /// Idempotent: deleting a missing transaction is a success (204).
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid id,
         CancellationToken cancellationToken = default)
@@ -157,22 +166,23 @@ public class TransactionController(
 
         if (entity == null)
         {
-            return NotFound();
+            return NoContent();
         }
 
+        // Another user's transaction is reported exactly as a missing one.
         if (!await IsOwnAccountAsync(entity.AccountId, cancellationToken))
         {
-            return NotFound();
+            return NoContent();
         }
 
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.RollbackAccountAmountAsync(entity, cancellationToken);
         await transactionRepository.DeleteAsync(entity, cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
-        return Ok();
+        return NoContent();
     }
 
     private async Task<bool> IsOwnAccountAsync(Guid accountId, CancellationToken cancellationToken)
