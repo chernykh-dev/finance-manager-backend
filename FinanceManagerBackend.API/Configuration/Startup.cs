@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
+using Quartz;
 
 namespace FinanceManagerBackend.API.Configuration;
 
@@ -85,7 +86,16 @@ public class Startup
             };
         });
 
-        services.AddHostedService<IdempotencyKeyCleanupService>();
+        services.AddQuartz(opt =>
+        {
+            opt.AddJob<IdempotencyKeyCleanupJob>(IdempotencyKeyCleanupJob.Key);
+            opt.AddTrigger(trigger => trigger
+                .ForJob(IdempotencyKeyCleanupJob.Key)
+                .WithIdentity($"{IdempotencyKeyCleanupJob.Key.Name}-trigger")
+                .WithCronSchedule(IdempotencyKeyCleanupJob.CronSchedule)
+                .StartNow());
+        });
+        services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
 
         services.AddMapster();
         MapsterConfiguration.RegisterMappings();
