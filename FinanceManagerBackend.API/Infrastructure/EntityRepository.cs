@@ -157,8 +157,8 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
     public async Task<bool> IncrementAsync(Guid id, Expression<Func<TEntity, decimal>> property, decimal delta,
         CancellationToken cancellationToken = default)
     {
-        // Table/column names come from the EF model (not user input) and are quoted by the provider;
-        // values go as parameters.
+        // Only identifiers from the EF model get into the SQL text, delimited by the provider;
+        // all values are parameters. Nothing from the request is concatenated.
         var entityType = context.Model.FindEntityType(typeof(TEntity))!;
         var table = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
         var sqlHelper = context.GetService<ISqlGenerationHelper>();
@@ -166,7 +166,14 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
         string Column(string propertyName) =>
             sqlHelper.DelimitIdentifier(entityType.FindProperty(propertyName)!.GetColumnName(table)!);
 
-        var column = Column(((MemberExpression)property.Body).Member.Name);
+        // x => x.Property, where Property is mapped: the column name is taken from the model, not from the lambda.
+        if (property.Body is not MemberExpression { Expression: ParameterExpression } member ||
+            entityType.FindProperty(member.Member.Name) == null)
+        {
+            throw new ArgumentException("Expected a mapped property access like x => x.Balance", nameof(property));
+        }
+
+        var column = Column(member.Member.Name);
 
         // Single statement: runs inside the current DB transaction (if any) and takes a row lock until it ends.
         var affected = await context.Database.ExecuteSqlRawAsync(
