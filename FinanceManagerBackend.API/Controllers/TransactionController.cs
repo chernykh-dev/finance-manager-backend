@@ -5,6 +5,7 @@ using FinanceManagerBackend.API.Infrastructure.Specifications;
 using FinanceManagerBackend.API.Models.Transactions;
 using FinanceManagerBackend.API.Services;
 using FluentValidation;
+using FluentValidation.Results;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,10 +15,12 @@ namespace FinanceManagerBackend.API.Controllers;
 /// Transaction controller.
 /// </summary>
 /// <param name="transactionRepository"></param>
+/// <param name="accountRepository"></param>
 /// <param name="transactionCommonValidator"></param>
 /// <param name="accountTransactionService"></param>
 public class TransactionController(
     IEntityRepository<Transaction> transactionRepository,
+    IEntityRepository<Account> accountRepository,
     IValidator<Transaction> transactionCommonValidator,
     IAccountTransactionService accountTransactionService
     ) : BaseController
@@ -39,6 +42,12 @@ public class TransactionController(
             return NotFound();
         }
 
+        // Transaction belongs to the owner of its account; another user's one is reported as missing.
+        if (!await IsOwnAccountAsync(entity.AccountId, cancellationToken))
+        {
+            return NotFound();
+        }
+
         return Ok(entity);
     }
 
@@ -55,6 +64,11 @@ public class TransactionController(
         [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate,
         CancellationToken cancellationToken = default)
     {
+        if (!await IsOwnAccountAsync(accountId, cancellationToken))
+        {
+            return NotFound();
+        }
+
         var entities =
             await transactionRepository.GetAccountTransactionsByPeriod(accountId, startDate, endDate,
                 cancellationToken);
@@ -75,6 +89,9 @@ public class TransactionController(
         CancellationToken cancellationToken = default)
     {
         var entity = request.Adapt<Transaction>();
+
+        // Must go before the replay check: a replay must never return another user's transaction.
+        await ThrowIfNotOwnAccountAsync(entity.AccountId, cancellationToken);
 
         if (entity.Id == Guid.Empty)
         {
@@ -156,12 +173,22 @@ public class TransactionController(
             return NotFound();
         }
 
+        if (!await IsOwnAccountAsync(entity.AccountId, cancellationToken))
+        {
+            return NotFound();
+        }
+
         var updatedEntity = request.Adapt<Transaction>();
         updatedEntity.Id = id;
+        // Not part of the request: keep the stored value instead of the entity default (now).
+        updatedEntity.CreatedAt = entity.CreatedAt;
+
+        // The transaction may be moved to another account: it must be the user's too.
+        await ThrowIfNotOwnAccountAsync(updatedEntity.AccountId, cancellationToken);
 
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.ReplaceAccountAmountAsync(entity, updatedEntity, cancellationToken);
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
@@ -171,6 +198,13 @@ public class TransactionController(
         return Ok();
     }
 
+    /// <summary>
+    /// Delete transaction.
+    /// Idempotent: deleting a missing transaction is a success (204).
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid id,
         CancellationToken cancellationToken = default)
@@ -179,16 +213,47 @@ public class TransactionController(
 
         if (entity == null)
         {
-            return NotFound();
+            return NoContent();
         }
 
-        var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+        // Another user's transaction is reported exactly as a missing one.
+        if (!await IsOwnAccountAsync(entity.AccountId, cancellationToken))
+        {
+            return NoContent();
+        }
+
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.RollbackAccountAmountAsync(entity, cancellationToken);
         await transactionRepository.DeleteAsync(entity, cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
-        return Ok();
+        return NoContent();
+    }
+
+    private async Task<bool> IsOwnAccountAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+
+        var account = await accountRepository.GetByReadonlyAsync(x => x.Id == accountId && x.UserId == userId,
+            cancellationToken);
+
+        return account != null;
+    }
+
+    /// <summary>
+    /// Another user's account is reported exactly like a missing one: the same 400 TransactionValidator returns.
+    /// </summary>
+    private async Task ThrowIfNotOwnAccountAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        if (await IsOwnAccountAsync(accountId, cancellationToken))
+        {
+            return;
+        }
+
+        throw new ValidationException([
+            new ValidationFailure(nameof(Transaction.AccountId), $"Account with id={accountId} not found")
+        ]);
     }
 }
