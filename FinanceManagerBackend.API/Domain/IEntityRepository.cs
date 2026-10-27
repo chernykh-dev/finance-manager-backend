@@ -106,6 +106,18 @@ public interface IEntityRepository<TEntity>
     Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically add delta to a numeric property of entity by id (property = property + delta)
+    /// in a single statement, so concurrent changes are never lost. Also sets UpdatedAt.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="property">Property to increment, e.g. x => x.Balance.</param>
+    /// <param name="delta">Signed amount to add.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>False if entity not found.</returns>
+    Task<bool> IncrementAsync(Guid id, Expression<Func<TEntity, decimal>> property, decimal delta,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns new started transaction.
     /// </summary>
     /// <param name="cancellationToken"></param>

@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Reflection;
 using FinanceManagerBackend.API.Domain;
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Exceptions;
@@ -98,6 +99,22 @@ public class EntityMemoryRepository<TEntity> : IEntityRepository<TEntity>, IDisp
         }
 
         await Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IncrementAsync(Guid id, Expression<Func<TEntity, decimal>> property, decimal delta,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_entities.TryGetValue(id, out var entity))
+        {
+            return await Task.FromResult(false);
+        }
+
+        var propertyInfo = (PropertyInfo)((MemberExpression)property.Body).Member;
+        propertyInfo.SetValue(entity, (decimal)propertyInfo.GetValue(entity)! + delta);
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        return await Task.FromResult(true);
     }
 
     /// <inheritdoc />
