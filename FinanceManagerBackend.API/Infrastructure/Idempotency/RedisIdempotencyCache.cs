@@ -45,6 +45,14 @@ public class RedisIdempotencyCache(IConnectionMultiplexer redis) : IIdempotencyC
 
     private async Task<T> Execute<T>(Func<IDatabase, Task<T>> operation)
     {
+        // The multiplexer keeps reconnecting in the background; while it's down, fail at once
+        // instead of waiting for a timeout on every request.
+        if (!redis.IsConnected)
+        {
+            throw new IdempotencyCacheUnavailableException(new RedisConnectionException(
+                ConnectionFailureType.UnableToConnect, "Redis is not connected"));
+        }
+
         try
         {
             return await operation(redis.GetDatabase());
