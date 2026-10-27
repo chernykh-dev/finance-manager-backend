@@ -6,10 +6,12 @@ using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.HttpPipelines;
 using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
 using FinanceManagerBackend.API.Infrastructure;
+using FinanceManagerBackend.API.Infrastructure.Scheduling;
 using FinanceManagerBackend.API.Options;
 using FinanceManagerBackend.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Quartz;
 
 namespace FinanceManagerBackend.API.Configuration;
 
@@ -100,6 +102,47 @@ public static class ServiceCollectionExtensions
                 .MakeGenericMethod(handlerType)
                 .Invoke(null, [services]);
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configure Quartz jobs.
+    /// Every IJob marked with <see cref="CronJobAttribute"/> is registered with a cron trigger.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    /// <exception cref="InvalidOperationException">Invalid cron expression.</exception>
+    public static IServiceCollection ConfigureJobs(this IServiceCollection services)
+    {
+        var jobTypes = Assembly.GetExecutingAssembly().GetTypes()
+            .Where(x => typeof(IJob).IsAssignableFrom(x) && !x.IsAbstract)
+            .Select(x => (Type: x, Attribute: x.GetCustomAttribute<CronJobAttribute>()))
+            .Where(x => x.Attribute != null)
+            .ToList();
+
+        services.AddQuartz(opt =>
+        {
+            foreach (var (jobType, attribute) in jobTypes)
+            {
+                if (!CronExpression.IsValidExpression(attribute!.CronExpression))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid cron expression '{attribute.CronExpression}' on {jobType.FullName}.");
+                }
+
+                var jobKey = new JobKey(jobType.Name);
+
+                opt.AddJob(jobType, jobKey);
+                opt.AddTrigger(trigger => trigger
+                    .ForJob(jobKey)
+                    .WithIdentity($"{jobType.Name}-trigger")
+                    .WithCronSchedule(attribute.CronExpression));
+            }
+        });
+
+        // Let a running job finish on shutdown.
+        services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
 
         return services;
     }

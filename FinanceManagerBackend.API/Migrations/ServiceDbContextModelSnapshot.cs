@@ -238,6 +238,48 @@ namespace FinanceManagerBackend.API.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("FinanceManagerBackend.API.Infrastructure.Idempotency.IdempotencyRecord", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("text")
+                        .HasColumnName("response_body");
+
+                    b.Property<string>("ResponseContentType")
+                        .HasColumnType("text")
+                        .HasColumnName("response_content_type");
+
+                    b.Property<int?>("ResponseStatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("response_status_code");
+
+                    b.HasKey("UserId", "Key")
+                        .HasName("pk_idempotency_keys");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_idempotency_keys_created_at");
+
+                    b.ToTable("idempotency_keys", (string)null);
+                });
+
             modelBuilder.Entity("FinanceManagerBackend.API.Domain.Entities.Account", b =>
                 {
                     b.HasOne("FinanceManagerBackend.API.Domain.Entities.Currency", null)
@@ -270,6 +312,16 @@ namespace FinanceManagerBackend.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_transactions_categories_category_id");
+                });
+
+            modelBuilder.Entity("FinanceManagerBackend.API.Infrastructure.Idempotency.IdempotencyRecord", b =>
+                {
+                    b.HasOne("FinanceManagerBackend.API.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_idempotency_keys_users_user_id");
                 });
 #pragma warning restore 612, 618
         }

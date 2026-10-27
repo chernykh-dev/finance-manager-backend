@@ -7,6 +7,7 @@ using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using FinanceManagerBackend.API.Exceptions;
 using FinanceManagerBackend.API.HttpPipelines.ExceptionHandlers;
+using FinanceManagerBackend.API.HttpPipelines.Idempotency;
 using FinanceManagerBackend.API.Infrastructure;
 using FinanceManagerBackend.API.Validators;
 using FluentValidation;
@@ -83,6 +84,8 @@ public class Startup
             };
         });
 
+        services.ConfigureJobs();
+
         services.AddMapster();
         MapsterConfiguration.RegisterMappings();
 
@@ -130,6 +133,7 @@ public class Startup
                     .Build();
 
                 opt.Filters.Add(new AuthorizeFilter(policy));
+                opt.Filters.Add<IdempotencyFilter>();
             })
             .AddJsonOptions(opt =>
             {
@@ -192,6 +196,8 @@ public class Startup
                 }
             });
         }
+
+        app.UseMiddleware<IdempotencyBufferingMiddleware>();
 
         app.UseRouting();
 

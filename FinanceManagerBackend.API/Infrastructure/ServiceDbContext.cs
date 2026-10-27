@@ -1,5 +1,6 @@
 ﻿using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Infrastructure.EntityConfigurations;
+using FinanceManagerBackend.API.Infrastructure.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinanceManagerBackend.API.Infrastructure;
@@ -39,6 +40,11 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
     /// Transactions.
     /// </summary>
     public DbSet<Transaction> Transactions { get; set; }
+
+    /// <summary>
+    /// Stored results of requests with Idempotency-Key.
+    /// </summary>
+    public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; }
 
     /// <summary>
     /// Configure to localhost postgresql.
