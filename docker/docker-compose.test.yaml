@@ -33,6 +33,14 @@
     depends_on:
       - fmb-app
     restart: always
+    networks:
+      - default
+      # PR preview stands (docker/docker-compose.preview.yaml) join it too.
+      - fmb-preview
 
 volumes:
   pgdata:
+
+networks:
+  fmb-preview:
+    external: true

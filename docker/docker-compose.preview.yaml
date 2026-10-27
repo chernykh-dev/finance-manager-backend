@@ -1,0 +1,58 @@
+# Per-PR preview stand (see docs/preview-stands.md). Run via docker/preview.sh, which sets PR_NUMBER
+# and the compose project name fmb-pr-<N>; volumes and the default network are per stand.
+services:
+  app:
+    container_name: fmb-pr-${PR_NUMBER:?}-app
+    image: ghcr.io/chernykh-dev/fmb-api:pr-${PR_NUMBER:?}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      POSTGRES_HOST: db
+      POSTGRES_DB: fmb-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: preview
+      REDIS_HOST: redis
+    mem_limit: 384m
+    networks:
+      - default
+      # Shared with the main nginx, which routes fmb-<N>.yourflow.pro to fmb-pr-<N>-app:8080.
+      - fmb-preview
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fmb-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: preview
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    mem_limit: 256m
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "32mb", "--maxmemory-policy", "volatile-lru" ]
+    mem_limit: 64m
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+
+networks:
+  fmb-preview:
+    external: true
