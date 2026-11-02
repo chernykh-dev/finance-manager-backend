@@ -20,7 +20,8 @@ public class EntityNotFoundExceptionHandler(
             return false;
         }
 
-        logger.LogWarning(exception, "Entity not found");
+        // Expected client error: no stack trace, not a warning.
+        logger.LogInformation("Entity not found: {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
 
         httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
 

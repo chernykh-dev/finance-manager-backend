@@ -16,7 +16,9 @@ public class ValidationExceptionHandler(
             return false;
         }
 
-        logger.LogError(exception, "Unhandled exception occurred");
+        // Expected client error: no stack trace, not an error-level entry.
+        logger.LogInformation("Validation failed for {Method} {Path}: {Errors}", httpContext.Request.Method,
+            httpContext.Request.Path, string.Join("; ", validationException.Errors.Select(e => e.ErrorMessage)));
 
         httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
         var context = new ProblemDetailsContext

@@ -45,6 +45,16 @@ public interface IEntityRepository<TEntity>
     Task<TEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get single entity by id readonly, locking its row (SELECT ... FOR UPDATE) until the current
+    /// DB transaction ends: concurrent writers of the same row wait instead of working on a stale copy.
+    /// Call inside a transaction (<see cref="BeginTransaction"/>), otherwise the lock is released at once.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    Task<TEntity?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get required single entity by id readonly.
     /// </summary>
     /// <param name="id"></param>
