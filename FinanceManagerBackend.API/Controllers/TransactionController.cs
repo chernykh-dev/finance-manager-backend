@@ -166,7 +166,11 @@ public class TransactionController(
     public async Task<IActionResult> UpdateAsync(Guid id, [FromBody] UpdateTransactionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var entity = await transactionRepository.GetByIdReadonlyAsync(id, cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+
+        // Locked until commit: a concurrent PUT/DELETE of this transaction waits and then sees our result,
+        // instead of rolling back the same old amount twice.
+        var entity = await transactionRepository.GetByIdForUpdateAsync(id, cancellationToken);
 
         if (entity == null)
         {
@@ -188,8 +192,6 @@ public class TransactionController(
 
         await transactionCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
-        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
-
         await accountTransactionService.ReplaceAccountAmountAsync(entity, updatedEntity, cancellationToken);
         await transactionRepository.UpdateAsync(updatedEntity, cancellationToken);
 
@@ -209,7 +211,11 @@ public class TransactionController(
     public async Task<IActionResult> DeleteAsync(Guid id,
         CancellationToken cancellationToken = default)
     {
-        var entity = await transactionRepository.GetByIdReadonlyAsync(id, cancellationToken);
+        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
+
+        // Locked until commit: a concurrent DELETE waits, then finds nothing (204) instead of
+        // rolling back the amount a second time.
+        var entity = await transactionRepository.GetByIdForUpdateAsync(id, cancellationToken);
 
         if (entity == null)
         {
@@ -221,8 +227,6 @@ public class TransactionController(
         {
             return NoContent();
         }
-
-        await using var transaction = await transactionRepository.BeginTransaction(cancellationToken);
 
         await accountTransactionService.RollbackAccountAmountAsync(entity, cancellationToken);
         await transactionRepository.DeleteAsync(entity, cancellationToken);

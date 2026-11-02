@@ -20,7 +20,8 @@ public class EntityExistsExceptionHandler(
             return false;
         }
 
-        logger.LogWarning(exception, "Entity already exists");
+        // Expected client error: no stack trace, not a warning.
+        logger.LogInformation("Entity already exists: {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
 
         httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
 

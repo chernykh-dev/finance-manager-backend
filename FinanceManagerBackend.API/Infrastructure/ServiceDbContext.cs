@@ -2,6 +2,7 @@
 using FinanceManagerBackend.API.Infrastructure.EntityConfigurations;
 using FinanceManagerBackend.API.Infrastructure.Idempotency;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace FinanceManagerBackend.API.Infrastructure;
 
@@ -61,7 +62,13 @@ public class ServiceDbContext(ILoggerFactory loggerFactory) : DbContext
         optionsBuilder
             .UseNpgsql($"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};")
             .UseLoggerFactory(loggerFactory)
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+            // EF logs every failed command / SaveChanges as an error, including expected ones: a primary key race
+            // between idempotent retries, a lock timeout on an in-flight Idempotency-Key. Unexpected failures still
+            // reach GlobalExceptionHandler, which logs them as errors with the stack trace.
+            .ConfigureWarnings(warnings => warnings.Log(
+                (CoreEventId.SaveChangesFailed, LogLevel.Information),
+                (RelationalEventId.CommandError, LogLevel.Information)));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

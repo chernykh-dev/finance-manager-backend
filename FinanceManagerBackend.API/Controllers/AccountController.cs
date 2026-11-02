@@ -84,6 +84,10 @@ public class AccountController(
         }
         entity.UserId = userId;
 
+        // A savepoint when Idempotency-Key handling already opened a transaction: a failed insert rolls back
+        // only this part and the rest of the request keeps working.
+        await using var transaction = await accountRepository.BeginTransaction(cancellationToken);
+
         // Must go before the name check: a replay of this very request would otherwise
         // hit "name already taken" by the account it created itself.
         var existing = await accountRepository.GetByIdReadonlyAsync(entity.Id, cancellationToken);
@@ -99,6 +103,12 @@ public class AccountController(
                 cancellationToken);
         if (entityWithName != null)
         {
+            // A concurrent duplicate of this very request created it after our id check: that's a replay.
+            if (entityWithName.Id == entity.Id)
+            {
+                return Replay(entityWithName, entity);
+            }
+
             return Problem(statusCode: StatusCodes.Status409Conflict,
                 title: "Account with this name already exists");
         }
@@ -109,11 +119,15 @@ public class AccountController(
         }
         catch (EntityExistsException)
         {
-            // A concurrent request with the same id won the insert.
+            // A concurrent request with the same id won the insert: roll back and read its committed result.
+            await transaction.RollbackAsync(cancellationToken);
+
             existing = await accountRepository.GetRequiredByIdReadonlyAsync(entity.Id, cancellationToken);
 
             return Replay(existing, entity);
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         var result = CreatedAtAction("Get", new { id = entity.Id }, entity.Adapt<AccountResponse>());
 
@@ -134,10 +148,10 @@ public class AccountController(
     private static bool IsSameContent(Account existing, Account requested)
     {
         // Another user's account is reported as a plain conflict, without its content.
+        // Balance is not compared: transactions change it after creation, so a late replay would never match.
         return existing.UserId == requested.UserId &&
                existing.Name == requested.Name &&
-               existing.CurrencyId == requested.CurrencyId &&
-               existing.Balance == requested.Balance;
+               existing.CurrencyId == requested.CurrencyId;
     }
 
     /// <summary>

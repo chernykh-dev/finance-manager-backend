@@ -41,6 +41,12 @@ public class EntityMemoryRepository<TEntity> : IEntityRepository<TEntity>, IDisp
     }
 
     /// <inheritdoc />
+    public async Task<TEntity?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await Task.FromResult(_entities.GetValueOrDefault(id));
+    }
+
+    /// <inheritdoc />
     public async Task<TEntity> GetRequiredByIdReadonlyAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await GetRequiredByIdAsync(id, cancellationToken);

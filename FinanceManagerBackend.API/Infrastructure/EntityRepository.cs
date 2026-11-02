@@ -52,6 +52,21 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
     }
 
     /// <inheritdoc />
+    public async Task<TEntity?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var (table, column) = GetSqlNames();
+
+        // Not composed further (no FirstOrDefault in SQL), so FOR UPDATE stays on the top-level SELECT.
+        var entities = await context
+            .Set<TEntity>()
+            .FromSqlRaw($"SELECT * FROM {table} WHERE {column(nameof(BaseEntity.Id))} = {{0}} FOR UPDATE", id)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return entities.SingleOrDefault();
+    }
+
+    /// <inheritdoc />
     public async Task<TEntity> GetRequiredByIdReadonlyAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var result = await GetByIdReadonlyAsync(id, cancellationToken);
@@ -179,18 +194,11 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
     public async Task<bool> IncrementAsync(Guid id, Expression<Func<TEntity, decimal>> property, decimal delta,
         CancellationToken cancellationToken = default)
     {
-        // Only identifiers from the EF model get into the SQL text, delimited by the provider;
-        // all values are parameters. Nothing from the request is concatenated.
-        var entityType = context.Model.FindEntityType(typeof(TEntity))!;
-        var table = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
-        var sqlHelper = context.GetService<ISqlGenerationHelper>();
-
-        string Column(string propertyName) =>
-            sqlHelper.DelimitIdentifier(entityType.FindProperty(propertyName)!.GetColumnName(table)!);
+        var (table, Column) = GetSqlNames();
 
         // x => x.Property, where Property is mapped: the column name is taken from the model, not from the lambda.
         if (property.Body is not MemberExpression { Expression: ParameterExpression } member ||
-            entityType.FindProperty(member.Member.Name) == null)
+            context.Model.FindEntityType(typeof(TEntity))!.FindProperty(member.Member.Name) == null)
         {
             throw new ArgumentException("Expected a mapped property access like x => x.Balance", nameof(property));
         }
@@ -200,7 +208,7 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
         // Single statement: runs inside the current DB transaction (if any) and takes a row lock until it ends.
         var affected = await context.Database.ExecuteSqlRawAsync(
             $$"""
-              UPDATE {{sqlHelper.DelimitIdentifier(table.Name, table.Schema)}}
+              UPDATE {{table}}
               SET {{column}} = {{column}} + {0}, {{Column(nameof(BaseEntity.UpdatedAt))}} = {1}
               WHERE {{Column(nameof(BaseEntity.Id))}} = {2}
               """,
@@ -208,6 +216,20 @@ public class EntityRepository<TEntity>(ServiceDbContext context, ILogger<EntityR
             cancellationToken);
 
         return affected > 0;
+    }
+
+    /// <summary>
+    /// Delimited table name and a column-name lookup for raw SQL. Only identifiers from the EF model get into
+    /// the SQL text, delimited by the provider; all values must go as parameters.
+    /// </summary>
+    private (string Table, Func<string, string> Column) GetSqlNames()
+    {
+        var entityType = context.Model.FindEntityType(typeof(TEntity))!;
+        var table = StoreObjectIdentifier.Table(entityType.GetTableName()!, entityType.GetSchema());
+        var sqlHelper = context.GetService<ISqlGenerationHelper>();
+
+        return (sqlHelper.DelimitIdentifier(table.Name, table.Schema),
+            propertyName => sqlHelper.DelimitIdentifier(entityType.FindProperty(propertyName)!.GetColumnName(table)!));
     }
 
     /// <inheritdoc />
