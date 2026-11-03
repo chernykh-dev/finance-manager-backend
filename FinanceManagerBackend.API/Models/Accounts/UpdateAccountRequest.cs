@@ -4,7 +4,8 @@ using System.Text.Json.Serialization;
 namespace FinanceManagerBackend.API.Models.Accounts;
 
 /// <summary>
-/// Update account request model.
+/// Update account request model. Balance is not part of it: it changes only through transactions
+/// and POST /account/{id}/balance-adjustment (a "balance" field sent by older clients is ignored).
 /// </summary>
 public class UpdateAccountRequest : BaseUpdateRequest
 {
@@ -19,12 +20,6 @@ public class UpdateAccountRequest : BaseUpdateRequest
     /// </summary>
     [Required]
     public string Name { get; set; }
-
-    /// <summary>
-    /// Updated account balance.
-    /// </summary>
-    [Required]
-    public decimal Balance { get; set; }
 
     /// <summary>
     /// Updated account category id.
