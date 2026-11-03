@@ -2,7 +2,10 @@
 using FinanceManagerBackend.API.Domain.Entities;
 using FinanceManagerBackend.API.Domain.Entities.Enums;
 using FinanceManagerBackend.API.Exceptions;
+using FinanceManagerBackend.API.Infrastructure;
 using FinanceManagerBackend.API.Models.Accounts;
+using FinanceManagerBackend.API.Models.Transactions;
+using FinanceManagerBackend.API.Services;
 using FluentValidation;
 using Mapster;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +19,8 @@ namespace FinanceManagerBackend.API.Controllers;
 /// <param name="accountCommonValidator"></param>
 public class AccountController(
     IEntityRepository<Account> accountRepository, IEntityRepository<Transaction> transactionRepository,
-    IValidator<Account> accountCommonValidator)
+    IValidator<Account> accountCommonValidator, IValidator<Transaction> transactionCommonValidator,
+    IAccountTransactionService accountTransactionService)
     : BaseController
 {
     /// <summary>
@@ -165,7 +169,11 @@ public class AccountController(
     public async Task<IActionResult> UpdateAsync(Guid id, [FromBody] UpdateAccountRequest request,
         CancellationToken cancellationToken = default)
     {
-        var entity = await accountRepository.GetByIdReadonlyAsync(id, cancellationToken);
+        await using var transaction = await accountRepository.BeginTransaction(cancellationToken);
+
+        // The whole row is written back, so the balance must be current: the lock makes concurrent
+        // transactions of this account (atomic balance UPDATE) wait instead of being overwritten.
+        var entity = await accountRepository.GetByIdForUpdateAsync(id, cancellationToken);
 
         if (entity == null)
         {
@@ -183,12 +191,79 @@ public class AccountController(
         updatedEntity.UserId = entity.UserId;
         updatedEntity.Status = entity.Status;
         updatedEntity.CreatedAt = entity.CreatedAt;
+        // Balance changes only through transactions and balance adjustments.
+        updatedEntity.Balance = entity.Balance;
 
         await accountCommonValidator.ValidateAndThrowAsync(updatedEntity, cancellationToken);
 
         await accountRepository.UpdateAsync(updatedEntity, cancellationToken);
 
+        await transaction.CommitAsync(cancellationToken);
+
         return Ok();
+    }
+
+    /// <summary>
+    /// Manual balance adjustment: set the account balance to the given value.
+    /// The difference with the current balance is recorded as a transaction in the system
+    /// "Корректировка" category (income if the balance grows, expense otherwise), so it shows up in history
+    /// and is consistent with concurrent transactions. Nothing is created if the balance is already equal.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    [HttpPost("{id:guid}/balance-adjustment")]
+    public async Task<ActionResult<BalanceAdjustmentResponse>> AdjustBalanceAsync(Guid id,
+        [FromBody] BalanceAdjustmentRequest request, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await accountRepository.BeginTransaction(cancellationToken);
+
+        // Locked until commit: the difference is computed from the current balance and no other
+        // transaction of this account can change it in between.
+        var account = await accountRepository.GetByIdForUpdateAsync(id, cancellationToken);
+
+        if (account == null || account.UserId != GetUserId())
+        {
+            return NotFound();
+        }
+
+        var delta = request.Balance - account.Balance;
+
+        TransactionResponse? adjustment = null;
+
+        if (delta != 0)
+        {
+            var entity = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                AccountId = account.Id,
+                CategoryId = Guid.Parse(delta > 0
+                    ? DbInitializer.BalanceAdjustmentIncomeCategoryId
+                    : DbInitializer.BalanceAdjustmentExpenseCategoryId),
+                Amount = Math.Abs(delta),
+                DateTime = request.DateTime ?? DateTimeOffset.UtcNow,
+                Comment = request.Comment
+            };
+
+            // Same rules as a regular transaction (e.g. a deleted account can't be adjusted).
+            await transactionCommonValidator.ValidateAndThrowAsync(entity, cancellationToken);
+
+            await transactionRepository.CreateAsync(entity, cancellationToken);
+            await accountTransactionService.UpdateAccountAmountAsync(entity, cancellationToken);
+
+            adjustment = entity.Adapt<TransactionResponse>();
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        var updatedAccount = await accountRepository.GetRequiredByIdReadonlyAsync(id, cancellationToken);
+
+        return Ok(new BalanceAdjustmentResponse
+        {
+            Account = updatedAccount.Adapt<AccountResponse>(),
+            Transaction = adjustment
+        });
     }
 
     /// <summary>

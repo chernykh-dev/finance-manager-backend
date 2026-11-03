@@ -23,6 +23,16 @@ public class DbInitializer
     public const string EurCurrencyId = "e17d279c-4ac8-4679-894d-5b5f5caed741";
 
     /// <summary>
+    /// System income category for manual balance adjustments (POST /account/{id}/balance-adjustment).
+    /// </summary>
+    public const string BalanceAdjustmentIncomeCategoryId = "1d6b623d-48ec-41fe-96a8-d6a427a5cdea";
+
+    /// <summary>
+    /// System expense category for manual balance adjustments (POST /account/{id}/balance-adjustment).
+    /// </summary>
+    public const string BalanceAdjustmentExpenseCategoryId = "674a6f9c-1e92-41ed-bdae-7c0c4909bda8";
+
+    /// <summary>
     /// Initialize database required data.
     /// </summary>
     /// <param name="context"></param>
@@ -85,6 +95,20 @@ public class DbInitializer
             {
                 context.Categories.Add(category);
             }
+
+            isAlreadyInitialized = false;
+        }
+
+        // System categories are checked one by one, so they are added to already initialized databases too.
+        var systemCategories = new List<Category>()
+        {
+            new Category() { Id = Guid.Parse(BalanceAdjustmentIncomeCategoryId), Name = "Корректировка", Emoji = "⚖️", IsIncome = true },
+            new Category() { Id = Guid.Parse(BalanceAdjustmentExpenseCategoryId), Name = "Корректировка", Emoji = "⚖️", IsIncome = false },
+        };
+
+        foreach (var category in systemCategories.Where(category => !context.Categories.Any(x => x.Id == category.Id)))
+        {
+            context.Categories.Add(category);
 
             isAlreadyInitialized = false;
         }
